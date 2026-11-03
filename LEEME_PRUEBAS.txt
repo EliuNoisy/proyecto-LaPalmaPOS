@@ -1,0 +1,30 @@
+PRUEBAS AUTOMATICAS (JUnit) - LA PALMA POS
+==========================================
+Carpeta: src/test/java/Login
+
+Como ejecutarlas
+  - NetBeans: clic derecho al proyecto -> Test  (o Run -> Test Project).
+  - Maven:    mvn test
+  - Una sola clase: mvn -Dtest=ValidarTest test
+  Ejecuta SIEMPRE desde la carpeta del proyecto (CodigoFuenteTest e HistorialServiceTest leen src/main/java).
+
+Clases de prueba (131 pruebas nuevas + las 3 que ya existian en ConsultarPersonalTest)
+  ValidarTest            Validaciones de formularios (nombre, correo, usuario, contrasena, producto, precio, cantidad).
+  LimiteCamposTest       Limite de caracteres que se pueden escribir en los campos.
+  SesionTest             Rol de la sesion (administrador / cajero) y cierre de sesion.
+  InventarioServiceTest  Validar existencias, descontar al cobrar, eliminar productos, umbrales de "por reponer".
+  HistorialServiceTest   Historial de cambios (HU18) y texto "Antes / Se agregaron / Total ahora" (HU7).
+  TicketServiceTest      Ticket de venta: efectivo, tarjeta, mixto, folio, total con letra.
+  ExportarTest           Generacion del PDF del reporte.
+  ReglasPantallaTest     Nombre de insumo, insumos repetidos, redondeo del cobro, busqueda sin acentos, categorias.
+  CodigoFuenteTest       Confirma que los avisos y comprobaciones de rol que piden las historias existen en el codigo.
+  FakeJdbc               Ayuda: base de datos de mentira (no es una prueba). Por eso no hace falta SQL Server.
+
+Importante
+  - Estas pruebas NO sustituyen la prueba manual de cada pantalla (ver hoja "Pruebas Sprint 1" del Excel).
+  - ConsultarPersonalTest (ya existia) consulta la base de datos REAL: necesita SQL Server encendido.
+  - Dos pruebas comparan el codigo contra lo que dice la historia y pueden fallar:
+      ValidarTest.precioCeroSeAceptaSegunLaHistoria
+      ValidarTest.existenciasDeProductoMayoresA9999SeRechazanSegunLaHistoria
+  - Cada prueba tiene arriba un comentario [HU, criterio, prueba manual]. El catalogo completo con la columna
+    de resultado esta en Pruebas_JUnit_LaPalma.xlsx.
