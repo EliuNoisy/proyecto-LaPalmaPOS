@@ -1,0 +1,72 @@
+LA PALMA POS - Java igual que el prototipo HTML
+================================================
+1) En SQL Server Management Studio abre  sql/00_instalar_todo.sql  y presiona Execute (F5).
+   - Trabaja sobre la base RefresqueríaLaPalma (la que usa el Java: servidor JORGEZAZUETA\SQLEXPRESS).
+   - Solo agrega tablas, columnas y procedimientos; no borra productos, empleados ni ventas.
+   - Al final aparece una tabla de verificación: todas las filas deben decir OK.
+   - Se puede ejecutar varias veces sin problema.
+   (Los archivos 01, 02, 03 y 04 son las mismas partes por separado; no los necesitas si corres el 00.)
+   Para QUITAR todo lo nuevo: sql/99_desinstalar_todo.sql (primero simula; cambia @CONFIRMAR a 1 para borrar).
+   Para reinstalar desde cero: 99_desinstalar_todo (con @CONFIRMAR = 1) y luego 00_instalar_todo.
+2) Abre el proyecto en NetBeans, Clean and Build, y entra como administrador.
+   Si falta algo en la base de datos, la pantalla de Inicio muestra un aviso rojo con lo que falta.
+3) Notas:
+   - Los .form de NetBeans de las pantallas modificadas ya no coinciden con el código; no las abras en el diseñador.
+   - Para guardar el reporte en PDF usa la impresora "Microsoft Print to PDF" en el cuadro de impresión.
+
+NUEVO DISEÑO (tema La Palma)
+   - Clase Login/Tema.java: colores, tipografía, botones y paneles redondeados para todo el sistema.
+   - Rediseñadas: Login, Inicio, Caja (ventas), ticket (TicketDialog), Inventario, Reporte de ventas (con gráfica),
+     Tickets, Historial e Insumos. Empleados, Agregar producto, Recetas, Release Planning y las ventanas de opciones
+     de comida usan Tema.vestir(...) y fondos verde azulado (FondosFrame/FondoAzul*.jpg).
+   - La lógica y la base de datos no cambiaron.
+
+CONEXIÓN A LA BASE DE DATOS (sin contraseñas en el código)
+Define antes de abrir el programa la variable de entorno LAPALMA_DB_PASSWORD con la contraseña de SQL Server
+(opcionales: LAPALMA_DB_USUARIO, LAPALMA_DB_SERVIDOR). También sirve -DLAPALMA_DB_PASSWORD=... en NetBeans.
+
+CORRECCIONES (última revisión)
+   - Login: se puede entrar con USUARIO o con CORREO (cualquiera de los dos) + contraseña. Ambos campos son obligatorios.
+   - Inventario: botón «Agregar producto» (nombre, precio, cantidad, categoría Comida/Bebidas/Snacks y tipo Directo/Preparado/Nieve).
+     El producto nuevo aparece en la caja en pocos segundos, sin cerrar ni actualizar nada.
+     Si el tipo es Preparado o Nieve, el programa abre Recetas para configurar sus insumos.
+   - Inventario: «Modificar producto» ahora también permite cambiar la IMAGEN (y la categoría de los productos nuevos).
+     Las imágenes se ajustan solas (conservan su proporción, no se deforman). Se guardan en la carpeta
+     «imagenes_productos», junto al programa; esa carpeta debe conservarse al mover o actualizar el programa.
+   - Historial: cada cambio de existencias guarda lo que había antes, lo que se agregó/quitó y el total.
+     Ejemplo: «Antes: 5 pzas · Se agregaron: +20 · Total ahora: 25 pzas». También registra cambios de nombre, precio,
+     categoría e imagen (antes → después).
+   - Para guardar imagen y categoría hace falta haber ejecutado sql/04_opcional_columnas_productos.sql (ya incluido en el 00).
+
+AYUDA Y PREVENCIÓN DE ERRORES: INVENTARIO, INSUMOS Y RECETAS (última revisión)
+   - Nuevas tarjetas «¿Cómo funciona esta pantalla?» en Inventario, Insumos y recetas, y Recetas, en palabras sencillas.
+     Se ocultan con «Ocultar ayuda» y se vuelven a abrir con «Mostrar ayuda»; el programa recuerda la elección de cada pantalla.
+     (Se guarda en las preferencias de Java del usuario de Windows; no toca la base de datos.)
+   - Inventario: los productos Preparados y de Nieve ya no se marcan «por reponer» con una cantidad que no usan; muestran las
+     PORCIONES que alcanzan con los insumos (igual que el aviso de la barra lateral) o «Falta configurar receta».
+     En «Modificar producto», la cantidad de esos productos queda bloqueada (su existencia son los insumos).
+     Los botones «Insumos» y «Recetas» ya no abren ventanas duplicadas.
+   - Insumos y recetas: columna «Estado» (Bien / Por reponer / Agotado), búsqueda sin importar acentos, «Corregir cantidad» con vista
+     previa («Bajará de 40 a 12») y confirmación si el cambio es muy grande, «Entrada rápida» con resumen antes de guardar,
+     no deja crear un insumo repetido (ni parecido), no deja escribir «1,500» (se leería como 1.5), no deja eliminar «Nieve» ni
+     insumos que usa alguna receta (dice cuáles productos). El botón Cerrar ahora es «Volver al inicio».
+   - Recetas: una sola ventana; avisa si hay cambios sin guardar al cambiar de producto o cerrar; marca en la lista los productos que
+     «Falta receta / Falta configurar» y permite verlos solos; el vaso/cono de la nieve solo ofrece vasos y conos; valida cada
+     cantidad diciendo de qué insumo se trata; confirma antes de pasar un producto a «Directo» (borra su receta).
+     Al agregar un producto preparado o de nieve, Recetas se abre con ese producto ya elegido.
+   - Nota: la compilación se revisó con JDK 21 contra las dependencias del proyecto; el proyecto sigue usando Java 22 en el pom.xml.
+     Haz «Clean and Build» en NetBeans antes de probar (el .jar de la raíz es el anterior).
+
+ELIMINAR PRODUCTOS Y AYUDA REVISADA (última revisión)
+   - IMPORTANTE: vuelve a ejecutar sql/00_instalar_todo.sql (o solo sql/05_eliminar_productos.sql). Agrega la columna
+     Productos.Eliminado; no borra nada. Sin ella, la pantalla de Inicio avisa «eliminar productos con ventas».
+   - Inventario: «Eliminar producto» sirve con CUALQUIER producto, también los que trae el programa y los que ya se vendieron.
+     Sin ventas se borra de la base. Con ventas se marca como eliminado: sale del inventario, de la caja y de las recetas,
+     pero sus ventas anteriores se conservan completas en reportes y tickets. Si se eliminan todos los productos de un botón de
+     fábrica (por ejemplo Nachos grandes y chicos), el botón desaparece solo de la caja en pocos segundos.
+     Un producto eliminado ya no se puede vender aunque su botón siguiera en pantalla.
+   - Inventario: se quitó la marca «La Palma» repetida de la barra superior (ya está en la barra lateral). Los accesos
+     «Ir a Insumos» y «Recetas» quedaron junto al buscador. El subtítulo ya no dice «todo en orden» si hay insumos por reponer.
+   - Ayuda de Inventario, Insumos y Recetas reescrita con el flujo real: insumos (lo que llega) -> recetas (cuánto gasta cada
+     producto) -> venta (descuenta sola) -> inventario (porciones que alcanzan). Los productos por pieza se surten en
+     Inventario -> Modificar producto; los preparados se surten en Insumos -> Entrada rápida.
