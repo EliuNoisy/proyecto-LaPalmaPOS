@@ -1,0 +1,25 @@
+PRUEBAS NUEVAS DEL SPRINT 1 (HU1, HU2, HU3, HU4, HU5, HU6, HU9)
+================================================================
+Se agregaron 4 clases en src/test/java/Login. NO se modificó ningún archivo del programa
+(src/main, sql, pom.xml, interfaces): solo se añadieron archivos de prueba.
+
+  Sprint1ReglasTest            27 pruebas  Valores limite de nombre, apellidos, correo, usuario, contrasena, producto, precio y cantidad.
+  Sprint1CodigoFuenteTest      47 pruebas  Revisa el codigo de empleados (HU2-HU5), producto (HU9), roles y orden de las reglas.
+  Sprint1EjecucionTest         23 pruebas  EJECUTA codigo real: limite de caracteres de campos de empleados, imagen de producto (15 MB, 600 px),
+                                           texto del historial del alta y rol de la sesion. Usa carpeta temporal y la borra.
+  Sprint1LoginInventarioTest   30 pruebas  Revisa login (bloqueo 5 intentos / 30 s, limites, rol), empleados e inventario (filtros, busqueda, insignia).
+  TOTAL                       127 pruebas nuevas
+
+COMO EJECUTARLAS (desde la carpeta SoftwarePalma)
+  NetBeans : clic derecho al proyecto -> Test
+  Maven    : mvn test
+  Solo las nuevas:  mvn -Dtest="Sprint1*Test" test
+  No necesitan SQL Server.
+
+RESULTADO ESPERADO
+  126 pasan y 1 FALLA A PROPOSITO:
+    Sprint1CodigoFuenteTest.listaNoMuestraContrasenasSegunLaHistoria
+  HU2 dice que la lista se muestra "sin contrasenas" y la tabla de Gestionar Empleados si tiene la columna Contrasena
+  (oculta con puntos y boton para verla). Es una diferencia entre la historia y el programa, no un error de la prueba.
+
+Importante: estas pruebas NO sustituyen la prueba manual P01-P32 de la hoja "Pruebas Sprint 1" del Excel.

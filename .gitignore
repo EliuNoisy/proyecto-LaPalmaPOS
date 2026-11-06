@@ -1,1 +1,13 @@
-node_modules/
+# Artefactos de build de Maven
+target/
+
+# Jar generado por el plugin antrun (copia en la raíz)
+/*.jar
+
+# NetBeans
+nbproject/private/
+nb-configuration.xml
+
+# Sistema operativo / editor
+*.log
+.DS_Store
