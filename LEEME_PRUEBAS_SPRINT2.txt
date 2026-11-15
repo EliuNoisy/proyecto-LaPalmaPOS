@@ -1,0 +1,18 @@
+PRUEBAS NUEVAS DEL SPRINT 2 (HU10 - Editar productos)
+=====================================================
+Carpeta: src/test/java/Login
+
+  Sprint2EditarProductosTest   52 pruebas  Reglas y limites al editar (nombre 40, precio 0.01-9,999.99, existencias 0-9,999),
+                                           limite de caracteres de los campos de la ventana de edicion, texto del historial
+                                           y revision del codigo de la edicion (c1 guardar, c2 lista actualizada,
+                                           c3 producto inexistente, c4 falla el guardado).
+
+Como ejecutarlas
+  - NetBeans: clic derecho a Sprint2EditarProductosTest -> Test File.
+  - Maven:    mvn -Dtest=Sprint2EditarProductosTest test
+  Ejecuta SIEMPRE desde la carpeta del proyecto (varias pruebas leen src/main/java).
+  No necesitan SQL Server.
+
+Importante
+  - Cada prueba lleva arriba [HU10, criterio, prueba manual P34-P37 de la hoja "Pruebas Sprint 2"].
+  - NO sustituyen la prueba manual P34-P37: revisan reglas y codigo, no que el aviso salga en pantalla.
