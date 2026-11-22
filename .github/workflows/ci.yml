@@ -16,14 +16,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Instalar Java 22
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '22'
           cache: maven
 
-      - name: Ejecutar pruebas JUnit
-        run: mvn -B -ntp test
+      - name: Ejecutar pruebas JUnit (sin las que requieren SQL Server local)
+        run: mvn -B -ntp test -Dtest='!ConsultarPersonalTest'
 
       - name: Guardar reportes de pruebas
         if: always()
