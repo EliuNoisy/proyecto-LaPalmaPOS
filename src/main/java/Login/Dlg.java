@@ -54,6 +54,29 @@ public final class Dlg {
         }
     }
 
+    /**
+     * Solo deja escribir números: dígitos y, si {@code decimales} lo permite, un punto con hasta 2 decimales
+     * (la coma se convierte en punto). Letras, signos y espacios no entran, ni escritos ni pegados.
+     * {@code decimales} se consulta en cada pulsación, así puede cambiar (por ejemplo «pieza» o «gramos»).
+     */
+    public static void soloNumeros(JTextComponent campo, int max, java.util.function.BooleanSupplier decimales) {
+        if (!(campo.getDocument() instanceof AbstractDocument)) return;
+        ((AbstractDocument) campo.getDocument()).setDocumentFilter(new DocumentFilter() {
+            @Override public void insertString(FilterBypass fb, int off, String s, AttributeSet a) throws BadLocationException {
+                replace(fb, off, 0, s, a);
+            }
+            @Override public void replace(FilterBypass fb, int off, int len, String s, AttributeSet a) throws BadLocationException {
+                if (s == null || s.isEmpty()) { super.replace(fb, off, len, s, a); return; }
+                s = s.replace(',', '.');
+                String actual = fb.getDocument().getText(0, fb.getDocument().getLength());
+                String nuevo = actual.substring(0, off) + s + actual.substring(off + len);
+                String patron = decimales.getAsBoolean() ? "^\\d*(\\.\\d{0,2})?$" : "^\\d*$";
+                if (nuevo.length() <= max && nuevo.matches(patron)) super.replace(fb, off, len, s, a);
+                else java.awt.Toolkit.getDefaultToolkit().beep();
+            }
+        });
+    }
+
     /** Cuando el formulario aparece, el cursor queda en este campo y su texto seleccionado. */
     public static void enfocar(JTextComponent campo) {
         campo.addAncestorListener(new AncestorListener() {

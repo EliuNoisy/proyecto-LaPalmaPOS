@@ -282,7 +282,8 @@ public class Sprint1LoginInventarioTest {
     @Test
     public void menuLateralMuestraInsigniaDePorReponer() throws IOException {
         String f = fuente("BarraLateral.java");
-        assertTrue(f.contains("InventarioService.lowCount(con)"));
+        assertTrue(f.contains("InventarioService.productosBajos(con)"));
+        assertTrue(f.contains("InventarioService.insumosBajos(con)"));
         assertTrue(f.contains("itemInventario"));
     }
 

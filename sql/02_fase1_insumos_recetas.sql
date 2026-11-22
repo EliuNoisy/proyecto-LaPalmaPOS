@@ -57,7 +57,7 @@ GO
     (N'Nieve','g',8000),(N'Vaso chico','pieza',50),(N'Vaso mediano','pieza',50),(N'Vaso grande','pieza',40),
     (N'Cono de oblea','pieza',40),(N'Cono de galleta','pieza',40),(N'Pepino','g',1500),(N'Jícama','g',1500),
     (N'Fresa','g',2000),(N'Crema','g',1500),(N'Hielo','g',10000),(N'Jarabe','g',2000),
-    (N'Churritos','g',1500),(N'Bolsa de Sabritas','pieza',40)
+    (N'Churritos','g',1500),(N'Bolsa de Cheetos','pieza',0),(N'Bolsa de Chips','pieza',0),(N'Bolsa de Doritos','pieza',0),(N'Bolsa de Tostitos','pieza',0)
     ) v(Nombre, Unidad, Existencias)
 )
 INSERT INTO dbo.Insumos (Nombre, Unidad, Existencias)

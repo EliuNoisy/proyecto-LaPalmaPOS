@@ -1,0 +1,19 @@
+PRUEBAS NUEVAS DEL SPRINT 2 (HU14 - Capturar productos y calcular total, HU15 - Cobrar, emitir ticket y descontar existencias)
+===============================================================================================================================
+Carpeta: src/test/java/Login   (solo se agregaron archivos de prueba; no se cambio el programa)
+
+  Sprint2HU14CapturarTotalTest   25 pruebas  Calcula el total (vacio, uno, varios, decimales, importe danado, quitar productos),
+                                             el cambio segun la forma de pago (efectivo, tarjeta, mixto, coma decimal, efectivo
+                                             invalido) y revisa el codigo: limite de 9,999 piezas, avisos de + y -, precio vigente
+                                             de Inventario, producto sin precio, revision de existencias y limpiar venta.
+  Sprint2HU15CobrarTicketTest    28 pruebas  Validar existencias antes de cobrar (administrador ve cantidades, cajero no), descontar
+                                             productos e insumos, fallos de stock, texto del ticket (efectivo, tarjeta, mixto,
+                                             folio, fecha, hora, total con letra) y revisa el codigo del boton Cobrar (reglas de
+                                             pago, orden validar -> guardar -> descontar -> confirmar, rollback si falla).
+
+Como ejecutarlas (desde la carpeta del proyecto; no necesitan SQL Server)
+  Una por una:  mvn -Dtest=Sprint2HU14CapturarTotalTest test
+                mvn -Dtest=Sprint2HU15CobrarTicketTest test
+  NetBeans:     clic derecho al archivo -> Test File.
+
+Cada prueba lleva arriba [HU, tema]. NO sustituyen la prueba manual: no comprueban que el ticket se abra en pantalla ni que los avisos salgan.

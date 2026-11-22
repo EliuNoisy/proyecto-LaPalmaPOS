@@ -29,10 +29,13 @@ public class frmAgregarProductos extends javax.swing.JDialog {
     private int idProducto = -1;
     /** Imagen que la persona eligió en esta ventana (se copia a la carpeta del programa al guardar). */
     private File imagenElegida = null;
+    /** La persona quitó la imagen del producto (ya confirmó); al actualizar se guarda «sin imagen». */
+    private boolean quitarImagen = false;
     /** Lo que se veía al abrir la ventana de edición, para saber qué cambió y registrarlo en el historial. */
     private String nombreOrig, categoriaOrig;
     private double precioOrig;
     private int cantidadOrig;
+    private String bolsaInsumo;   // si no es null, «Cantidad» son las piezas de ese insumo (botanas de bolsa)
     private boolean fijo = false;   // producto que viene con el programa (su botón en caja ya existe)
 
     private static final String[] TIPOS_UI = {"Directo (por pieza)", "Preparado (insumos)", "Nieve (por bolas)"};
@@ -196,6 +199,7 @@ public class frmAgregarProductos extends javax.swing.JDialog {
         });
 
         btnImagen   = new javax.swing.JButton();
+        btnQuitarImagen = new javax.swing.JButton();
         btnGuardar  = new javax.swing.JButton();
         btnCancelar = new javax.swing.JButton();
 
@@ -280,6 +284,17 @@ public class frmAgregarProductos extends javax.swing.JDialog {
         btnImagen.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
         btnImagen.addActionListener(e -> seleccionarImagen());
 
+        // ── Botón quitar imagen (rojo; pide confirmación) ─────────────────────
+        btnQuitarImagen.setBackground(new java.awt.Color(200, 40, 40));
+        btnQuitarImagen.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 12));
+        btnQuitarImagen.setForeground(java.awt.Color.WHITE);
+        btnQuitarImagen.setText("Quitar foto");
+        btnQuitarImagen.setFocusPainted(false);
+        btnQuitarImagen.setBorderPainted(false);
+        btnQuitarImagen.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        btnQuitarImagen.setEnabled(false);   // se habilita cuando hay una imagen que quitar
+        btnQuitarImagen.addActionListener(e -> confirmarQuitarImagen());
+
         // ── Botón Guardar ─────────────────────────────────────────────────────
         btnGuardar.setBackground(new java.awt.Color(20, 80, 180));
         btnGuardar.setFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 13));
@@ -333,7 +348,9 @@ public class frmAgregarProductos extends javax.swing.JDialog {
                     .addComponent(cmbCategoria, javax.swing.GroupLayout.PREFERRED_SIZE, FLD_W, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addComponent(cmbTipo,      javax.swing.GroupLayout.PREFERRED_SIZE, FLD_W, javax.swing.GroupLayout.PREFERRED_SIZE)
                     .addGroup(layout.createSequentialGroup()
-                        .addComponent(btnImagen,  javax.swing.GroupLayout.PREFERRED_SIZE, 135, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(btnImagen,       javax.swing.GroupLayout.PREFERRED_SIZE, 135, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(btnQuitarImagen, javax.swing.GroupLayout.PREFERRED_SIZE, 135, javax.swing.GroupLayout.PREFERRED_SIZE))
                         .addGap(8)
                         .addComponent(lblPreview, javax.swing.GroupLayout.PREFERRED_SIZE, 90, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addGap(PAD))
@@ -369,7 +386,10 @@ public class frmAgregarProductos extends javax.swing.JDialog {
             .addGap(GAP)
             .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.CENTER)
                 .addComponent(lblImagen)
-                .addComponent(btnImagen,  javax.swing.GroupLayout.PREFERRED_SIZE, ROW_H, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGroup(layout.createSequentialGroup()
+                    .addComponent(btnImagen,       javax.swing.GroupLayout.PREFERRED_SIZE, ROW_H, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addGap(6)
+                    .addComponent(btnQuitarImagen, javax.swing.GroupLayout.PREFERRED_SIZE, ROW_H, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addComponent(lblPreview, javax.swing.GroupLayout.PREFERRED_SIZE, 80, javax.swing.GroupLayout.PREFERRED_SIZE))
             .addGap(PAD)
             .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
@@ -398,10 +418,26 @@ public class frmAgregarProductos extends javax.swing.JDialog {
         if (img == null) {
             lblPreview.setIcon(null);
             lblPreview.setText("Sin imagen");
+            btnQuitarImagen.setEnabled(false);
             return;
         }
         lblPreview.setIcon(ImagenProducto.ajustada(img, 86, 76, null));
         lblPreview.setText("");
+        btnQuitarImagen.setEnabled(true);
+    }
+
+    /** Quita la imagen del producto, pero solo si la persona lo confirma. Nada se borra hasta pulsar «Actualizar». */
+    private void confirmarQuitarImagen() {
+        String nombre = txtNombre.getText().trim();
+        boolean ok = Tema.confirmar(this, "¿Quitar la imagen?",
+                "Vas a quitar la imagen" + (nombre.isEmpty() ? "" : " de «" + nombre + "»") + ".\n"
+                + "En la caja el producto saldrá solo con su nombre.\n"
+                + "El cambio se guarda al pulsar «" + btnGuardar.getText() + "».",
+                "Sí, quitar", true);
+        if (!ok) return;
+        imagenElegida = null;
+        quitarImagen = idProducto != -1;   // al agregar un producto nuevo basta con descartar la elegida
+        mostrarVistaPrevia(null);
     }
 
     private void seleccionarImagen() {
@@ -422,6 +458,7 @@ public class frmAgregarProductos extends javax.swing.JDialog {
                 return;
             }
             imagenElegida = archivo;          // se copia a la carpeta del programa hasta que se guarde
+            quitarImagen = false;
             mostrarVistaPrevia(img);
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(this, "No se pudo leer la imagen: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
@@ -477,14 +514,15 @@ public class frmAgregarProductos extends javax.swing.JDialog {
         try (Connection con = ConexionSQL.getConexionSqlServer()) {
             if (con == null) throw new SQLException("No hay conexión con la base de datos.");
             boolean extra = tieneColumnasExtra(con);
-            if (!extra && imagenElegida != null) {
+            if (!extra && (imagenElegida != null || quitarImagen)) {
                 JOptionPane.showMessageDialog(this,
                         "Para guardar imágenes y categorías falta ejecutar sql/04_opcional_columnas_productos.sql en SQL Server.",
                         "Falta actualizar la base de datos", JOptionPane.WARNING_MESSAGE);
                 return;
             }
             // La imagen se copia a la carpeta del programa (ya reducida) y se guarda su ruta
-            String rutaNueva = imagenElegida == null ? null : ImagenProducto.importar(imagenElegida, nombre);
+            String rutaNueva = quitarImagen ? ImagenProducto.SIN_IMAGEN
+                    : imagenElegida == null ? null : ImagenProducto.importar(imagenElegida, nombre);
 
             if (idProducto == -1) {
                 insertar(con, extra, nombre, precio, cantidad, categoria, rutaNueva);
@@ -561,6 +599,33 @@ public class frmAgregarProductos extends javax.swing.JDialog {
         lblCantidad.setToolTipText(txtCantidad.getToolTipText());
     }
 
+    /**
+     * Botanas de bolsa («Cheetos (solos)», «Doritos preparados»...): su existencia es la del insumo «Bolsa de ...»,
+     * compartida por toda la marca. Aquí se muestra y se edita ESA cantidad (en piezas). Si el insumo no existe, se deja bloqueada.
+     */
+    public void cantidadDeBolsa(String bolsa) {
+        if (bolsa == null) return;
+        try (Connection con = ConexionSQL.getConexionSqlServer();
+             PreparedStatement ps = con.prepareStatement("SELECT Existencias FROM dbo.Insumos WHERE Nombre = ?")) {
+            ps.setString(1, bolsa);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return;
+                int piezas = (int) Math.floor(rs.getDouble(1) + 1e-9);
+                bolsaInsumo = bolsa;
+                cantidadOrig = piezas;
+                txtCantidad.setText(String.valueOf(piezas));
+                txtCantidad.setEnabled(true);
+                btnMas.setEnabled(true);
+                btnMenos.setEnabled(true);
+                String tip = "Piezas de «" + bolsa + "». Se comparte con los demás productos de la misma marca.";
+                txtCantidad.setToolTipText(tip);
+                lblCantidad.setToolTipText(tip);
+            }
+        } catch (SQLException | NullPointerException ex) {
+            // sin conexión o sin insumo: el campo se queda como estaba
+        }
+    }
+
     // ── EDICIÓN: solo se escribe lo que cambió, y el historial guarda antes / cambio / total ──
     private void actualizar(Connection con, boolean extra, String nombre, double precio, int cantidad,
                             String categoria, String ruta) throws SQLException {
@@ -586,10 +651,24 @@ public class frmAgregarProductos extends javax.swing.JDialog {
             }
             if (catA == null || catA.trim().isEmpty()) catA = "Comida";
 
+            // Botanas de bolsa: la cantidad que se edita es la del insumo, no la de Productos.Cantidad
+            int insumoId = -1;
+            if (bolsaInsumo != null) {
+                try (PreparedStatement si = con.prepareStatement(
+                        "SELECT InsumoID, Existencias FROM dbo.Insumos WITH (UPDLOCK, ROWLOCK) WHERE Nombre = ?")) {
+                    si.setString(1, bolsaInsumo);
+                    try (ResultSet r = si.executeQuery()) {
+                        if (r.next()) { insumoId = r.getInt(1); cantA = (int) Math.floor(r.getDouble(2) + 1e-9); }
+                        else bolsaInsumo = null;   // el insumo desapareció: no se toca la cantidad
+                    }
+                }
+            }
+
             boolean cNombre = !nombre.equals(nombreA);
             boolean cPrecio = Math.abs(precio - precioA) > 0.004;
             boolean cCant   = cantidad != cantidadOrig && cantidad != cantA;
             boolean cCat    = extra && !categoria.equals(catA);
+            boolean quito   = ImagenProducto.SIN_IMAGEN.equals(ruta);
             boolean cImg    = ruta != null;
             if (!cNombre && !cPrecio && !cCant && !cCat && !cImg) {
                 con.rollback();
@@ -606,15 +685,24 @@ public class frmAgregarProductos extends javax.swing.JDialog {
                 sets.add("Precio = ?"); vals.add(precio);
                 det.add("Precio: $" + String.format(java.util.Locale.US, "%.2f", precioA) + " → $" + String.format(java.util.Locale.US, "%.2f", precio));
             }
-            if (cCant)   { sets.add("Cantidad = ?"); vals.add(cantidad); det.add(HistorialService.cambioCantidad(cantA, cantidad, null)); }
+            if (cCant && insumoId != -1) {
+                try (PreparedStatement ui = con.prepareStatement("UPDATE dbo.Insumos SET Existencias = ? WHERE InsumoID = ?")) {
+                    ui.setDouble(1, cantidad);
+                    ui.setInt(2, insumoId);
+                    ui.executeUpdate();
+                }
+                det.add(bolsaInsumo + " → " + HistorialService.cambioCantidad(cantA, cantidad, "pieza"));
+            } else if (cCant) { sets.add("Cantidad = ?"); vals.add(cantidad); det.add(HistorialService.cambioCantidad(cantA, cantidad, null)); }
             if (cCat)    { sets.add("Categoria = ?"); vals.add(categoria); det.add("Categoría: " + catA + " → " + categoria); }
-            if (cImg)    { sets.add("Imagen = ?"); vals.add(ruta); det.add("Se cambió la imagen"); }
+            if (cImg)    { sets.add("Imagen = ?"); vals.add(ruta); det.add(quito ? "Se quitó la imagen" : "Se cambió la imagen"); }
 
-            try (PreparedStatement up = con.prepareStatement("UPDATE dbo.Productos SET " + String.join(", ", sets) + " WHERE id = ?")) {
-                int i = 1;
-                for (Object v : vals) up.setObject(i++, v);
-                up.setInt(i, idProducto);
-                up.executeUpdate();
+            if (!sets.isEmpty()) {
+                try (PreparedStatement up = con.prepareStatement("UPDATE dbo.Productos SET " + String.join(", ", sets) + " WHERE id = ?")) {
+                    int i = 1;
+                    for (Object v : vals) up.setObject(i++, v);
+                    up.setInt(i, idProducto);
+                    up.executeUpdate();
+                }
             }
             String accion = (cCant && !cNombre && !cPrecio && !cCat && !cImg) ? (cantidad > cantA ? "Entrada" : "Ajuste") : "Edición";
             HistorialService.log(con, accion, "Producto: " + nombre, String.join(" | ", det));
@@ -630,6 +718,7 @@ public class frmAgregarProductos extends javax.swing.JDialog {
     private javax.swing.JButton           btnCancelar;
     private javax.swing.JButton           btnGuardar;
     private javax.swing.JButton           btnImagen;
+    private javax.swing.JButton           btnQuitarImagen;
     private javax.swing.JButton           btnMas;
     private javax.swing.JButton           btnMenos;
     private javax.swing.JComboBox<String> cmbCategoria;

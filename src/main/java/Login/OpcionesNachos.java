@@ -113,13 +113,13 @@ public class OpcionesNachos extends javax.swing.JDialog {
     }
 
     private void btnNachosGrandesActionPerformed(java.awt.event.ActionEvent evt) {
-        parent.agregarProducto("11", "Nachos grandes", 1, 50.00);
+        parent.agregarProducto("11", "Nachos con carne grandes", 1, 50.00);
         parent.calcularTotal();
         this.dispose();
     }
 
     private void btnNachosChicosActionPerformed(java.awt.event.ActionEvent evt) {
-        parent.agregarProducto("12", "Nachos Chicos", 1, 35.00);
+        parent.agregarProducto("12", "Nachos con carne chicos", 1, 35.00);
         parent.calcularTotal();
         this.dispose();
     }

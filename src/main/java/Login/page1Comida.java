@@ -375,13 +375,8 @@ public class page1Comida extends javax.swing.JPanel {
     }//GEN-LAST:event_jBtnTortaEspecialActionPerformed
 
     private void jBtnHeladosActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jBtnHeladosActionPerformed
-        String id = "31";
-        String nombre = "helados";
-        int cantidad = 1;
-        double precio = 15.00;
-
-        parent.agregarProducto(id, nombre, cantidad, precio);
-        parent.calcularTotal();
+        // Se elige el sabor (cada sabor es un producto del inventario: «Helado de ...»)
+        OpcionesHelados.abrir(parent);
     }//GEN-LAST:event_jBtnHeladosActionPerformed
 
     private void jBtnTortaDeJamonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jBtnTortaDeJamonActionPerformed

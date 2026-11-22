@@ -49,8 +49,26 @@ public class BarraLateral extends JPanel {
     private final List<Item> items = new ArrayList<>();
     private final List<JLabel> grupos = new ArrayList<>();
     private final List<JComponent> soloAnchas = new ArrayList<>();
-    private Item itemInventario;
+    private Item itemInventario, itemInsumos;
     private int porReponer = 0;
+    /** Barras que están en pantalla: así cualquier ventana puede pedir que la insignia se actualice al instante. */
+    private static final List<BarraLateral> VIVAS = new ArrayList<>();
+
+    /** Vuelve a contar los artículos por reponer y actualiza la insignia de todas las barras abiertas. */
+    public static void actualizarInsignia() {
+        Runnable r = () -> { for (BarraLateral b : new ArrayList<>(VIVAS)) b.cargarAlertas(); };
+        if (javax.swing.SwingUtilities.isEventDispatchThread()) r.run(); else javax.swing.SwingUtilities.invokeLater(r);
+    }
+
+    @Override public void addNotify() {
+        super.addNotify();
+        if (!VIVAS.contains(this)) VIVAS.add(this);
+    }
+
+    @Override public void removeNotify() {
+        VIVAS.remove(this);
+        super.removeNotify();
+    }
 
     public BarraLateral(JFrame dueno, Seccion activa) {
         this.dueno = dueno;
@@ -64,6 +82,9 @@ public class BarraLateral extends JPanel {
         add(pie(), BorderLayout.SOUTH);
         aplicarAncho();
         cargarAlertas();
+        dueno.addWindowFocusListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowGainedFocus(java.awt.event.WindowEvent e) { cargarAlertas(); }
+        });
     }
 
     // ── Marca ────────────────────────────────────────────────────────────
@@ -112,7 +133,8 @@ public class BarraLateral extends JPanel {
             nav.add(grupo("Administración"));
             itemInventario = item(Seccion.INVENTARIO, "box", "Inventario");
             nav.add(itemInventario);
-            nav.add(item(Seccion.INSUMOS, "leaf", "Insumos y recetas"));
+            itemInsumos = item(Seccion.INSUMOS, "leaf", "Insumos y recetas");
+            nav.add(itemInsumos);
             nav.add(item(Seccion.EMPLEADOS, "users", "Empleados"));
             nav.add(grupo("Consultas"));
             nav.add(item(Seccion.REPORTE, "doc", "Reporte de ventas"));
@@ -176,16 +198,19 @@ public class BarraLateral extends JPanel {
     // ── Insignia «por reponer» ───────────────────────────────────────────
     private void cargarAlertas() {
         if (itemInventario == null) return;
-        new SwingWorker<Integer, Void>() {
-            @Override protected Integer doInBackground() throws Exception {
+        new SwingWorker<int[], Void>() {
+            @Override protected int[] doInBackground() throws Exception {
                 try (Connection con = ConexionSQL.getConexionSqlServer()) {
-                    return InventarioService.lowCount(con);
+                    return new int[]{InventarioService.productosBajos(con), InventarioService.insumosBajos(con)};
                 }
             }
             @Override protected void done() {
-                try { porReponer = get(); } catch (Exception e) { porReponer = 0; }
-                itemInventario.insignia = porReponer;
+                int[] n;
+                try { n = get(); } catch (Exception e) { n = new int[]{0, 0}; }
+                porReponer = n[0];
+                itemInventario.insignia = n[0];      // Inventario: solo productos
                 itemInventario.repaint();
+                if (itemInsumos != null) { itemInsumos.insignia = n[1]; itemInsumos.repaint(); }   // Insumos y recetas: solo insumos
             }
         }.execute();
     }

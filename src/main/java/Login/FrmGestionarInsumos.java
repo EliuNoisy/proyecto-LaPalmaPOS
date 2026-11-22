@@ -48,7 +48,7 @@ public class FrmGestionarInsumos extends JFrame {
     }
 
     private final DefaultTableModel modelo = new DefaultTableModel(
-            new Object[]{"ID", "Insumo", "Cómo se mide", "Hay ahora", "Estado"}, 0) {
+            new Object[]{"ID", "Insumo", "Cómo se mide", "Hay ahora", "Mínimo", "Estado"}, 0) {
         @Override public boolean isCellEditable(int r, int c) { return false; }
     };
     private final JTable tabla = new JTable(modelo);
@@ -84,10 +84,11 @@ public class FrmGestionarInsumos extends JFrame {
         tabla.getColumnModel().getColumn(0).setMinWidth(0);
         tabla.getColumnModel().getColumn(0).setMaxWidth(0);
         tabla.getColumnModel().getColumn(0).setPreferredWidth(0);
-        tabla.getColumnModel().getColumn(1).setPreferredWidth(340);
-        tabla.getColumnModel().getColumn(2).setPreferredWidth(230);
-        tabla.getColumnModel().getColumn(3).setPreferredWidth(170);
-        tabla.getColumnModel().getColumn(4).setPreferredWidth(140);
+        tabla.getColumnModel().getColumn(1).setPreferredWidth(300);
+        tabla.getColumnModel().getColumn(2).setPreferredWidth(210);
+        tabla.getColumnModel().getColumn(3).setPreferredWidth(150);
+        tabla.getColumnModel().getColumn(4).setPreferredWidth(150);
+        tabla.getColumnModel().getColumn(5).setPreferredWidth(130);
         tabla.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
         tabla.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
             @Override public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean foc, int row, int col) {
@@ -130,16 +131,29 @@ public class FrmGestionarInsumos extends JFrame {
               + "en <b>Recetas</b> dices cuánto gasta cada producto → al vender, el sistema descuenta solo → "
               + "en <b>Inventario</b> ves cuántas porciones alcanzan.",
                 new String[][]{
-                    {"Revisa qué tienes.", "La lista muestra cuánto hay de cada insumo. <b>Amarillo</b> = queda poco (por reponer: "
-                        + InventarioService.LOW + " piezas o " + InventarioService.LOW_GRAMOS + " g o menos). <b>Rojo</b> = se acabó y ya no se podrán vender los productos que lo usan."},
+                    {"Revisa qué tienes.", "La lista muestra cuánto hay de cada insumo y su <b>mínimo</b> (el número con el que debe avisarte). "
+                        + "<b>Amarillo</b> = ya llegó a su mínimo o queda menos (por reponer). <b>Rojo</b> = se acabó y ya no se podrán vender los productos que lo usan."},
+                    {"¿Cuándo sale el aviso?", "En cuanto un insumo llega a <b>su mínimo o menos</b> (o se agota) te avisamos en tres lugares: aquí arriba junto al título, con un número naranja en <b>Insumos y recetas</b> del menú "
+                        + "y en <b>Inicio</b>. El número se actualiza solo al vender, dar entrada o editar; desaparece cuando vuelves a surtir ese insumo."},
+                    {"Cambiar el límite de aviso.", "Elige un insumo y pulsa <b>Stock mínimo</b>: escribe con cuántas piezas (o gramos) quieres que te avise. "
+                        + "Al principio es " + InventarioService.LOW + " piezas o " + InventarioService.LOW_GRAMOS + " g. Solo el administrador puede cambiarlo y acepta números enteros de 0 a 99999. "
+                        + "También puedes aplicar el mismo número a todos los insumos que se miden igual."},
                     {"Llegó mercancía.", "Pulsa <b>Entrada rápida</b>, escribe SOLO lo que llegó y guarda. El sistema lo suma a lo que ya había. Es lo que usarás casi todos los días."},
                     {"Contaste y no coincide.", "Pulsa <b>Editar</b>, elige el insumo y escribe lo que realmente hay ahora. "
                         + "Úsalo solo para corregir un conteo (por ejemplo, por merma), no para registrar compras."},
+                    {"Bolsas de sabritas (marca o sabor).", "Cada marca o sabor de bolsa es un insumo que se llama <b>«Bolsa de ...»</b> (ejemplo: Bolsa de Doritos, Bolsa de Ruffles). "
+                        + "Al vender una «Sabritas con ...» o «Sabritas preparadas», la caja pregunta cuál bolsa se usó y muestra <b>todos los insumos que empiezan con «Bolsa de»</b>. "
+                        + "Para tener una opción nueva, solo agrégala aquí con ese nombre y pon cuántas hay; si está en 0 sale «Agotado»."},
                     {"Insumo nuevo.", "Pulsa <b>Agregar insumo</b>. Elige si se cuenta por pieza (pan, vasos) o se pesa en gramos (carne, queso). "
                         + "Después ponlo en la receta de los productos que lo usan."},
+                    {"Bolsas «solas» y «preparadas».", "Cada marca (Cheetos, Chips, Doritos, Tostitos y Sabritas) tiene UN solo insumo, por ejemplo <b>Bolsa de Doritos</b>. "
+                        + "En la caja salen dos productos con precio distinto, <b>«Doritos (solos)»</b> y <b>«Doritos preparados»</b>, pero cada venta de cualquiera de los dos descuenta "
+                        + "<b>1 pieza de esa misma bolsa</b>. Las «Sabritas con carne, queso, salchicha…» también gastan 1 <b>Bolsa de Sabritas</b>. "
+                        + "Tú solo surtes la bolsa aquí con <b>Entrada rápida</b>; no registres «solos» y «preparados» por separado."},
                     {"¿Qué lleva cada producto?", "Pulsa <b>Configurar recetas</b> para indicar cuánto insumo gasta cada producto."},
                     {"Quitar un insumo.", "Usa <b>Eliminar</b> solo con los que ya no usas. Si algún producto lo lleva en su receta, te dice cuáles; quítalo de ahí primero."}},
                 "Todo cambio queda guardado en el Historial. El insumo «Nieve» siempre debe existir para poder vender nieve. "
+              + "El mínimo de un insumo es aparte del de los productos: este avisa aquí, el de los productos avisa en Inventario. "
               + "Los productos que se venden por pieza (refrescos, bolsitas) NO se surten aquí: se cambian en Inventario → Modificar producto.");
 
         // ── Búsqueda y acciones ──────────────────────────────────────────
@@ -158,6 +172,9 @@ public class FrmGestionarInsumos extends JFrame {
         JButton bEntrada = boton("Entrada rápida", Tema.PALMA);
         JButton bAjustar = boton("Editar", Tema.TEAL);
         JButton bEliminar = boton("Eliminar", Tema.ROJO);
+        JButton bMinimo = boton("Stock mínimo", Tema.TEAL);
+        bMinimo.setToolTipText("Define con cuántas piezas o gramos este insumo aparece como «por reponer».");
+        bMinimo.addActionListener(e -> stockMinimo());
         bAgregar.setToolTipText("Registra un insumo que todavía no está en la lista.");
         bEntrada.setToolTipText("Llegó mercancía: escribe lo que llegó y se suma a lo que ya hay.");
         bAjustar.setToolTipText("Contaste y la cantidad no coincide: escribe lo que realmente hay.");
@@ -168,7 +185,7 @@ public class FrmGestionarInsumos extends JFrame {
         bEliminar.addActionListener(e -> eliminar());
         JPanel acciones = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         acciones.setOpaque(false);
-        acciones.add(bEntrada); acciones.add(bAgregar); acciones.add(bAjustar); acciones.add(bEliminar);
+        acciones.add(bEntrada); acciones.add(bAgregar); acciones.add(bAjustar); acciones.add(bMinimo); acciones.add(bEliminar);
         JPanel herr = new JPanel(new BorderLayout());
         herr.setOpaque(false);
         herr.add(txtBuscar, BorderLayout.WEST);
@@ -182,8 +199,8 @@ public class FrmGestionarInsumos extends JFrame {
         cardTabla.setBorder(BorderFactory.createEmptyBorder(6, 6, 8, 6));
         cardTabla.add(sp, BorderLayout.CENTER);
 
-        JLabel leyenda = Tema.etiqueta("Elige un insumo de la lista para editar su cantidad o eliminarlo.  "
-                + "Amarillo = queda poco · Rojo = agotado.", Font.PLAIN, 14, Tema.GRIS);
+        JLabel leyenda = Tema.etiqueta("Elige un insumo de la lista para editar su cantidad, cambiar su stock mínimo o eliminarlo.  "
+                + "Amarillo = llegó a su mínimo · Rojo = agotado.", Font.PLAIN, 14, Tema.GRIS);
 
         JPanel centro = new JPanel(new BorderLayout(0, 14));
         centro.setOpaque(false);
@@ -224,14 +241,20 @@ public class FrmGestionarInsumos extends JFrame {
     // ── Estado de cada insumo ───────────────────────────────────────────────
     /** 0 = bien, 1 = por reponer, 2 = agotado. */
     private static int nivel(double v, String unidad) {
+        return nivel(v, InventarioService.minimoInsumoPorDefecto(unidad));
+    }
+
+    /** Con el mínimo propio del insumo: llegar a él (o bajar de él) es «por reponer». */
+    private static int nivel(double v, double minimo) {
         if (v <= 0) return 2;
-        return ("pieza".equals(unidad) ? v <= InventarioService.LOW : v <= InventarioService.LOW_GRAMOS) ? 1 : 0;
+        return v <= minimo ? 1 : 0;
     }
 
     private int nivel(int row) {
         if (row < 0 || row >= modelo.getRowCount()) return 0;
         Cant c = (Cant) modelo.getValueAt(row, 3);
-        return nivel(c.v, c.unidad);
+        Cant m = (Cant) modelo.getValueAt(row, 4);
+        return nivel(c.v, m.v);
     }
 
     private static String textoNivel(int n) { return n == 2 ? "Agotado" : n == 1 ? "Por reponer" : "Bien"; }
@@ -249,8 +272,14 @@ public class FrmGestionarInsumos extends JFrame {
         modelo.setRowCount(0);
         String q = Tema.norm(txtBuscar.getText());
         int totales = 0;
+        // mínimo propio de cada insumo (sql/07); si la columna aún no existe se usa el límite general de antes
+        String min = Esquema.insumoMinimoListo() ? "StockMinimo"
+                : "CASE WHEN Unidad = 'pieza' THEN " + InventarioService.LOW + " ELSE " + InventarioService.LOW_GRAMOS + " END";
         try (Connection con = ConexionSQL.getConexionSqlServer();
-             PreparedStatement ps = con.prepareStatement("SELECT InsumoID, Nombre, Unidad, Existencias FROM dbo.Insumos ORDER BY Nombre");
+             PreparedStatement ps = con.prepareStatement("SELECT InsumoID, Nombre, Unidad, Existencias, " + min + " FROM dbo.Insumos ORDER BY "
+                 + "CASE WHEN Existencias <= 0 THEN 0 "                                  // primero los agotados
+                 + "WHEN Existencias <= (" + min + ") THEN 1 "                           // luego los por reponer
+                 + "ELSE 2 END, Nombre");
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 totales++;
@@ -258,8 +287,9 @@ public class FrmGestionarInsumos extends JFrame {
                 if (!q.isEmpty() && !Tema.norm(nombre).contains(q)) continue;
                 String u = rs.getString(3);
                 Cant c = new Cant(rs.getDouble(4), u);
+                Cant m = new Cant(rs.getDouble(5), u);
                 modelo.addRow(new Object[]{rs.getInt(1), nombre,
-                    "pieza".equals(u) ? "Se cuenta por pieza" : "Se pesa en gramos", c, textoNivel(nivel(c.v, u))});
+                    "pieza".equals(u) ? "Se cuenta por pieza" : "Se pesa en gramos", c, m, textoNivel(nivel(c.v, m.v))});
             }
         } catch (Exception ex) {
             error("No se pudieron cargar los insumos.\nRevisa la conexión con la base de datos y que ya hayas ejecutado "
@@ -270,15 +300,19 @@ public class FrmGestionarInsumos extends JFrame {
         for (int i = 0; i < modelo.getRowCount(); i++) { int n = nivel(i); if (n == 2) agotados++; else if (n == 1) bajos++; }
         String base = q.isEmpty() ? totales + " insumos" : "Mostrando " + modelo.getRowCount() + " de " + totales + " insumos";
         if (agotados + bajos == 0) {
+            lblEstado.setIcon(null);
             lblEstado.setText(base + " · todo en orden");
             lblEstado.setForeground(Tema.GRIS);
         } else {
-            lblEstado.setText("⚠ " + base + " · " + (agotados > 0 ? agotados + " agotado(s)" : "")
+            lblEstado.setIcon(Tema.iconoAdvertencia(Tema.AMBAR_TEXTO));
+            lblEstado.setIconTextGap(6);
+            lblEstado.setText(base + " · " + (agotados > 0 ? agotados + " agotado(s)" : "")
                     + (agotados > 0 && bajos > 0 ? " y " : "") + (bajos > 0 ? bajos + " por reponer" : ""));
             lblEstado.setForeground(Tema.AMBAR_TEXTO);
         }
         for (int i = 0; i < modelo.getRowCount(); i++)
             if ((int) modelo.getValueAt(i, 0) == idSeleccion) { tabla.setRowSelectionInterval(i, i); break; }
+        BarraLateral.actualizarInsignia();
     }
 
     private void error(String m) { JOptionPane.showMessageDialog(this, m, "Error", JOptionPane.ERROR_MESSAGE); }
@@ -290,22 +324,35 @@ public class FrmGestionarInsumos extends JFrame {
      */
     private Double validarCantidad(String txt, String unidad, boolean permitirCero, JTextField campo, String quien) {
         String pref = quien == null ? "" : "«" + quien + "»: ";
+        String err = errorCantidad(txt, unidad, permitirCero);
+        if (err != null) { Validar.mostrar(this, pref + err, campo); return null; }
+        return Double.parseDouble(txt.trim().replace(",", "."));
+    }
+
+    /** Regla de la cantidad sin tocar la pantalla (así se puede probar con JUnit). Devuelve el mensaje de error o null si es válida. */
+    static String errorCantidad(String txt, String unidad, boolean permitirCero) {
         String t0 = txt == null ? "" : txt.trim();
         String t = t0.replace(",", ".");
-        String err = null;
-        if (t0.isEmpty()) err = "Escribe la cantidad.";
-        else if (t0.matches("^\\d{1,3}(,\\d{3})+(\\.\\d+)?$"))
-            err = "Escribe el número sin coma para los miles (por ejemplo 1500 y no 1,500).";
-        else if (!t.matches("^\\d+(\\.\\d{1,2})?$"))
-            err = "La cantidad solo puede llevar números, sin letras ni signos (ejemplo: 25 o 12.5).";
-        else {
-            double v = Double.parseDouble(t);
-            if ("pieza".equals(unidad) && v != Math.rint(v)) err = "Este insumo se cuenta por pieza: escribe un número entero, sin decimales.";
-            else if (v > 99999) err = "La cantidad máxima es 99,999.";
-            else if (!permitirCero && v <= 0) err = "La cantidad debe ser mayor a 0.";
-        }
-        if (err != null) { Validar.mostrar(this, pref + err, campo); return null; }
-        return Double.parseDouble(t);
+        if (t0.isEmpty()) return "Escribe la cantidad.";
+        if (t0.matches("^\\d{1,3}(,\\d{3})+(\\.\\d+)?$"))
+            return "Escribe el número sin coma para los miles (por ejemplo 1500 y no 1,500).";
+        if (!t.matches("^\\d+(\\.\\d{1,2})?$"))
+            return "La cantidad solo puede llevar números, sin letras ni signos (ejemplo: 25 o 12.5).";
+        double v = Double.parseDouble(t);
+        if ("pieza".equals(unidad) && v != Math.rint(v)) return "Este insumo se cuenta por pieza: escribe un número entero, sin decimales.";
+        if (v > 99999) return "La cantidad máxima es 99,999.";
+        if (!permitirCero && v <= 0) return "La cantidad debe ser mayor a 0.";
+        return null;
+    }
+
+    /** Regla del stock mínimo sin tocar la pantalla: entero de 0 a 99999. Devuelve el mensaje de error o null si es válido. */
+    static String errorMinimo(String txt) {
+        String t = txt == null ? "" : txt.trim();
+        if (t.isEmpty()) return "Escribe un número (por ejemplo 10).";
+        if (!t.matches("\\d+")) return "Escribe solo números enteros, sin letras, signos ni decimales.";
+        if (t.length() > 5 || Integer.parseInt(t) > InventarioService.MINIMO_MAX)
+            return "Debe estar entre 0 y " + InventarioService.MINIMO_MAX + ".";
+        return null;
     }
 
     private static String validarNombre(String n) {
@@ -347,11 +394,18 @@ public class FrmGestionarInsumos extends JFrame {
         ButtonGroup g = new ButtonGroup();
         g.add(rPieza); g.add(rGramos);
         JTextField exist = new JTextField("0", 8);
-        Dlg.limite(exist, 9);
+        Dlg.soloNumeros(exist, 8, () -> rGramos.isSelected());   // pieza = entero; gramos = hasta 2 decimales
+        final boolean conMin = Esquema.insumoMinimoListo();
+        JTextField minimo = new JTextField(String.valueOf(InventarioService.LOW), 8);
+        Dlg.soloNumeros(minimo, 5, () -> false);
+        // al cambiar «cómo se mide» se propone el límite general de esa medida, salvo que ya lo hayas cambiado a mano
+        rPieza.addActionListener(e -> { if (String.valueOf(InventarioService.LOW_GRAMOS).equals(minimo.getText())) minimo.setText(String.valueOf(InventarioService.LOW)); });
+        rGramos.addActionListener(e -> { if (String.valueOf(InventarioService.LOW).equals(minimo.getText())) minimo.setText(String.valueOf(InventarioService.LOW_GRAMOS)); });
         JPanel p = new JPanel(new GridLayout(0, 1, 4, 6));
         p.add(new JLabel("Nombre del insumo (máximo 30 letras):")); p.add(nombre);
         p.add(new JLabel("¿Cómo se mide?")); p.add(rPieza); p.add(rGramos);
         p.add(new JLabel("¿Cuánto hay hoy? (si no sabes, deja 0 y luego usa «Entrada rápida»)")); p.add(exist);
+        if (conMin) { p.add(new JLabel("Avisar «por reponer» cuando queden este número o menos:")); p.add(minimo); }
         Dlg.enfocar(nombre);
 
         while (true) {
@@ -361,6 +415,8 @@ public class FrmGestionarInsumos extends JFrame {
             String u = rPieza.isSelected() ? "pieza" : "g";
             Double ex = validarCantidad(exist.getText(), u, true, exist, null);
             if (ex == null) continue;
+            if (conMin && Validar.mostrar(this, errorMinimo(minimo.getText()), minimo)) continue;
+            final int min = conMin ? Integer.parseInt(minimo.getText().trim()) : InventarioService.minimoInsumoPorDefecto(u);
             try (Connection con = ConexionSQL.getConexionSqlServer()) {
                 String parecido = nombreParecido(con, n);
                 if (parecido != null) {
@@ -368,11 +424,15 @@ public class FrmGestionarInsumos extends JFrame {
                             + "o «Editar» en lugar de crearlo otra vez.", nombre);
                     continue;
                 }
-                try (PreparedStatement ps = con.prepareStatement("INSERT INTO dbo.Insumos (Nombre, Unidad, Existencias) VALUES (?, ?, ?)")) {
+                try (PreparedStatement ps = con.prepareStatement(conMin
+                        ? "INSERT INTO dbo.Insumos (Nombre, Unidad, Existencias, StockMinimo) VALUES (?, ?, ?, ?)"
+                        : "INSERT INTO dbo.Insumos (Nombre, Unidad, Existencias) VALUES (?, ?, ?)")) {
                     ps.setString(1, n); ps.setString(2, u); ps.setDouble(3, ex);
+                    if (conMin) ps.setInt(4, min);
                     ps.executeUpdate();
                 }
-                HistorialService.log(con, "Alta", "Insumo: " + n, "Unidad " + u + ", existencias " + InventarioService.fmtCant(ex, u));
+                HistorialService.log(con, "Alta", "Insumo: " + n, "Unidad " + u + ", existencias " + InventarioService.fmtCant(ex, u)
+                        + (conMin ? ", stock mínimo " + InventarioService.fmtCant(min, u) : ""));
                 txtBuscar.setText("");
                 cargar(idPorNombre(n));
                 Dlg.aviso(this, "Insumo agregado", "«" + n + "» quedó registrado. Ya puedes usarlo en las recetas.");
@@ -398,7 +458,7 @@ public class FrmGestionarInsumos extends JFrame {
         final Cant act = (Cant) modelo.getValueAt(fila, 3);
 
         JTextField nueva = new JTextField(plano(act.v), 10);
-        Dlg.limite(nueva, 9);
+        Dlg.soloNumeros(nueva, 8, () -> !"pieza".equals(act.unidad));
         JLabel vista = Tema.etiqueta(" ", Font.BOLD, 14, Tema.GRIS);
         Runnable actualizarVista = () -> {
             String t = nueva.getText().trim().replace(",", ".");
@@ -456,6 +516,122 @@ public class FrmGestionarInsumos extends JFrame {
         }
     }
 
+    // ── Stock mínimo (cuándo avisar «por reponer») ──────────────────────────
+    /**
+     * Cambia con cuántas piezas/gramos un insumo aparece como «por reponer». Igual que en Inventario: solo números enteros de 0 a 99999,
+     * avisos cuando el valor suele ser un error, confirmación que dice qué cambia y todo guardado junto (o se guarda todo o nada).
+     * Con la casilla se aplica el mismo número a todos los insumos que se miden igual (por pieza o en gramos).
+     */
+    private void stockMinimo() {
+        if (!InventarioService.esAdmin()) {
+            Dlg.aviso(this, "Solo el administrador", "Solo el administrador puede cambiar el stock mínimo.");
+            return;
+        }
+        int fila = filaSeleccionada();
+        if (fila < 0) return;
+        if (!Esquema.insumoMinimoListo()) {
+            Dlg.aviso(this, "Falta actualizar la base de datos", "Para definir el stock mínimo de los insumos falta actualizar la base de datos.\n"
+                    + "Ejecuta sql/00_instalar_todo.sql en SQL Server (solo agrega una columna) y vuelve a intentarlo.");
+            return;
+        }
+        final int id = (int) modelo.getValueAt(fila, 0);
+        final String nombre = modelo.getValueAt(fila, 1).toString();
+        final Cant act = (Cant) modelo.getValueAt(fila, 3);
+        final Cant minAct = (Cant) modelo.getValueAt(fila, 4);
+        final String u = act.unidad;
+        final boolean pieza = "pieza".equals(u);
+
+        JTextField campo = new JTextField(String.valueOf((long) minAct.v), 8);
+        Dlg.soloNumeros(campo, 5, () -> false);
+        campo.setFont(Tema.fuente(Font.BOLD, 18));
+        campo.setHorizontalAlignment(SwingConstants.CENTER);
+        javax.swing.JCheckBox todos = new javax.swing.JCheckBox("Poner este mismo mínimo a todos los insumos que " + (pieza ? "se cuentan por pieza" : "se pesan en gramos"));
+        JPanel p = new JPanel(new GridLayout(0, 1, 4, 6));
+        p.add(Tema.etiqueta("«" + nombre + "»", Font.BOLD, 17, Tema.TINTA));
+        p.add(new JLabel("Hay ahora: " + act + "  ·  Mínimo actual: " + minAct));
+        p.add(new JLabel("Avisar «por reponer» cuando queden este número de " + (pieza ? "piezas" : "gramos") + " o menos:"));
+        p.add(campo);
+        p.add(todos);
+        Dlg.enfocar(campo);
+
+        while (true) {
+            if (!Dlg.formulario(this, "Stock mínimo", p, "Guardar")) return;
+            if (Validar.mostrar(this, errorMinimo(campo.getText()), campo)) continue;
+            final int nuevo = Integer.parseInt(campo.getText().trim());
+
+            // Quiénes cambian de verdad: {id, nombre, existencias, mínimo anterior}
+            List<Object[]> cambian = new ArrayList<>();
+            int elegidos = 1;
+            try (Connection con = ConexionSQL.getConexionSqlServer()) {
+                if (todos.isSelected()) {
+                    try (PreparedStatement ps = con.prepareStatement("SELECT InsumoID, Nombre, Existencias, StockMinimo FROM dbo.Insumos WHERE "
+                            + (pieza ? "Unidad = 'pieza'" : "Unidad <> 'pieza'") + " ORDER BY Nombre");
+                         ResultSet rs = ps.executeQuery()) {
+                        elegidos = 0;
+                        while (rs.next()) {
+                            elegidos++;
+                            if (rs.getInt(4) != nuevo) cambian.add(new Object[]{rs.getInt(1), rs.getString(2), rs.getDouble(3), rs.getInt(4)});
+                        }
+                    }
+                } else if ((int) minAct.v != nuevo) {
+                    cambian.add(new Object[]{id, nombre, act.v, (int) minAct.v});
+                }
+            } catch (SQLException ex) {
+                error("No se pudo revisar la lista de insumos: " + ex.getMessage());
+                return;
+            }
+            if (cambian.isEmpty()) {
+                Dlg.aviso(this, "Sin cambios", elegidos <= 1 ? "Ese insumo ya tiene stock mínimo " + InventarioService.fmtCant(nuevo, u) + ". No hay nada que cambiar."
+                        : "Todos esos insumos ya tienen stock mínimo " + InventarioService.fmtCant(nuevo, u) + ". No hay nada que cambiar.");
+                return;
+            }
+
+            // Avisos por valores que suelen ser un error al teclear
+            StringBuilder avisos = new StringBuilder();
+            if (nuevo == 0) avisos.append("\n• Ojo: Con 0 solo se avisará cuando el insumo se agote por completo.");
+            if (nuevo > 1000 && pieza) avisos.append("\n• Ojo: ").append(nuevo).append(" piezas es un número muy alto. ¿Seguro que no es menos?");
+            int quedanBajos = 0;
+            for (Object[] c : cambian) {
+                double ex = (Double) c[2];
+                if (ex > 0 && ex <= nuevo && !(ex <= (Integer) c[3])) quedanBajos++;
+            }
+            if (quedanBajos > 0)
+                avisos.append("\n• Ojo: ").append(quedanBajos == 1 ? "1 insumo pasará" : quedanBajos + " insumos pasarán").append(" a «por reponer» de inmediato.");
+
+            // Confirmación que dice exactamente qué se va a cambiar
+            String msg;
+            if (cambian.size() == 1) {
+                msg = "«" + Dlg.h((String) cambian.get(0)[1]) + "»\nStock mínimo: " + InventarioService.fmtCant((Integer) cambian.get(0)[3], u)
+                        + " → " + InventarioService.fmtCant(nuevo, u);
+            } else {
+                StringBuilder sb = new StringBuilder("Se cambiará el stock mínimo de " + cambian.size() + " insumos a " + InventarioService.fmtCant(nuevo, u) + ":\n");
+                for (int i = 0; i < Math.min(8, cambian.size()); i++) sb.append("• ").append(Dlg.h((String) cambian.get(i)[1])).append("\n");
+                if (cambian.size() > 8) sb.append("… y ").append(cambian.size() - 8).append(" más.\n");
+                msg = sb.toString();
+            }
+            if (elegidos > cambian.size()) msg += "\n(" + (elegidos - cambian.size()) + " ya tenían ese valor y no se tocan.)";
+            if (avisos.length() > 0) msg += "\n" + avisos;
+            if (!Tema.confirmar(this, "¿Cambiar stock mínimo?", msg, "Sí, cambiar", false)) continue;
+
+            // Guardar todo junto: o se cambian todos o no se cambia ninguno
+            List<Integer> ids = new ArrayList<>();
+            for (Object[] c : cambian) ids.add((Integer) c[0]);
+            try (Connection con = ConexionSQL.getConexionSqlServer()) {
+                if (con == null) throw new SQLException("No hay conexión con la base de datos.");
+                InventarioService.guardarStockMinimoInsumos(con, ids, nuevo);
+                for (Object[] c : cambian)
+                    HistorialService.log(con, "Edición", "Insumo: " + c[1], "Stock mínimo: " + InventarioService.fmtCant((Integer) c[3], u) + " → " + InventarioService.fmtCant(nuevo, u));
+            } catch (SQLException | InventarioService.StockException ex) {
+                error("No se pudo guardar el stock mínimo. No se cambió nada.\n" + ex.getMessage());
+                return;
+            }
+            cargar(id);   // estados y alertas (número naranja del menú) se actualizan al instante
+            Dlg.aviso(this, "Stock mínimo guardado", cambian.size() == 1 ? "Listo: «" + nombre + "» avisará con " + InventarioService.fmtCant(nuevo, u) + " o menos."
+                    : "Listo: se cambió el stock mínimo de " + cambian.size() + " insumos a " + InventarioService.fmtCant(nuevo, u) + ".");
+            return;
+        }
+    }
+
     // ── Entrada rápida de varios insumos ────────────────────────────────────
     private void entradaRapida() {
         DefaultTableModel m = new DefaultTableModel(new Object[]{"ID", "Insumo", "Cómo se mide", "Hay ahora", "Llegó hoy (+)"}, 0) {
@@ -485,6 +661,13 @@ public class FrmGestionarInsumos extends JFrame {
         t.getColumnModel().getColumn(0).setMaxWidth(0);
         t.getColumnModel().getColumn(1).setPreferredWidth(240);
         t.setSurrendersFocusOnKeystroke(true);
+        // columna «Llegó hoy (+)»: solo números (enteros si el insumo es por pieza)
+        JTextField campoLlego = new JTextField();
+        Dlg.soloNumeros(campoLlego, 8, () -> {
+            int r = t.getEditingRow();
+            return r < 0 || !"pieza".equals(((Cant) m.getValueAt(r, 3)).unidad);
+        });
+        t.getColumnModel().getColumn(4).setCellEditor(new javax.swing.DefaultCellEditor(campoLlego));
 
         JDialog d = new JDialog(this, "Entrada rápida de insumos", true);
         JButton guardar = boton("Guardar entradas", Tema.PALMA);

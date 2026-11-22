@@ -4,7 +4,7 @@
 -- QUÉ BORRA:
 --   * Tablas: Insumos, Recetas, Configuracion, Historial
 --   * Procedimientos: sp_SembrarInsumos, sp_SembrarRecetas, sp_RestaurarSistema
---   * Columnas de Productos: Tipo, Bolas, ContenedorID, Eliminado
+--   * Columnas de Productos: Tipo, Bolas, ContenedorID, Eliminado, StockMinimo
 --   * Columnas de Ventas: MetodoPago, MontoTarjeta, Empleado
 -- QUÉ SE PIERDE: insumos, recetas, historial de cambios y, en las ventas ya registradas,
 --   el método de pago (tarjeta/mixto) y quién atendió. Los productos, empleados, totales,
@@ -50,7 +50,7 @@ FROM (
 ) c
 JOIN sys.columns k ON k.object_id = c.t AND k.column_id = c.col
 WHERE OBJECT_SCHEMA_NAME(c.t) = N'dbo' AND (
-       (OBJECT_NAME(c.t) = N'Productos' AND k.name IN (N'Tipo', N'Bolas', N'ContenedorID', N'Eliminado'))
+       (OBJECT_NAME(c.t) = N'Productos' AND k.name IN (N'Tipo', N'Bolas', N'ContenedorID', N'Eliminado', N'StockMinimo'))
     OR (OBJECT_NAME(c.t) = N'Ventas'    AND k.name IN (N'MetodoPago', N'MontoTarjeta', N'Empleado'))
     OR (@QUITAR_CATEGORIA_IMAGEN = 1 AND OBJECT_NAME(c.t) = N'Productos' AND k.name IN (N'Categoria', N'Imagen')));
 
@@ -64,7 +64,7 @@ ORDER BY v.o;
 -- 5) Columnas nuevas
 INSERT @acc (txt)
 SELECT N'ALTER TABLE dbo.' + QUOTENAME(v.t) + N' DROP COLUMN ' + QUOTENAME(v.c)
-FROM (VALUES (N'Productos', N'Tipo'), (N'Productos', N'Bolas'), (N'Productos', N'ContenedorID'), (N'Productos', N'Eliminado'),
+FROM (VALUES (N'Productos', N'Tipo'), (N'Productos', N'Bolas'), (N'Productos', N'ContenedorID'), (N'Productos', N'Eliminado'), (N'Productos', N'StockMinimo'),
              (N'Ventas', N'MetodoPago'), (N'Ventas', N'MontoTarjeta'), (N'Ventas', N'Empleado')) v(t, c)
 WHERE COL_LENGTH(N'dbo.' + v.t, v.c) IS NOT NULL;
 
@@ -114,6 +114,7 @@ SELECT Pieza, CASE WHEN Existe = 1 THEN 'AÚN EXISTE' ELSE 'QUITADO' END AS Esta
  ('Productos.Bolas',          CASE WHEN COL_LENGTH('dbo.Productos','Bolas')        IS NULL THEN 0 ELSE 1 END),
  ('Productos.ContenedorID',   CASE WHEN COL_LENGTH('dbo.Productos','ContenedorID') IS NULL THEN 0 ELSE 1 END),
  ('Productos.Eliminado',      CASE WHEN COL_LENGTH('dbo.Productos','Eliminado')    IS NULL THEN 0 ELSE 1 END),
+ ('Productos.StockMinimo',    CASE WHEN COL_LENGTH('dbo.Productos','StockMinimo')  IS NULL THEN 0 ELSE 1 END),
  ('Ventas.MetodoPago',        CASE WHEN COL_LENGTH('dbo.Ventas','MetodoPago')      IS NULL THEN 0 ELSE 1 END),
  ('Ventas.MontoTarjeta',      CASE WHEN COL_LENGTH('dbo.Ventas','MontoTarjeta')    IS NULL THEN 0 ELSE 1 END),
  ('Ventas.Empleado',          CASE WHEN COL_LENGTH('dbo.Ventas','Empleado')        IS NULL THEN 0 ELSE 1 END),

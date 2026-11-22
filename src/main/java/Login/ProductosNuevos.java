@@ -113,7 +113,7 @@ public final class ProductosNuevos {
                                 f.append(id).append('|').append(nombre).append('|').append(precio).append('|').append(img).append(';');
                             }
                         }
-                    } else if (categoria.equals(cat)) {
+                    } else if (categoria.equals(cat) && !OpcionesHelados.esSabor(nombre)) {   // los sabores de helado salen en la ventana de Helados, no como tarjetas
                         d.nuevos.add(new Object[]{id, nombre, precio, img});
                         f.append(id).append('|').append(nombre).append('|').append(precio).append('|').append(img).append(';');
                     }

@@ -36,6 +36,7 @@ public class FrmMenuAdmin extends JFrame {
     private final JLabel lblTickets = new JLabel("…");
     private final JLabel lblAlerta = new JLabel("…");
     private final JLabel lblAlertaTit = new JLabel("Existencias");
+    private BarraLateral.Seccion destinoAlerta = BarraLateral.Seccion.INVENTARIO;
     private final Tema.Redondo cardAlerta = new Tema.Redondo(28, Tema.BLANCO, Tema.LINEA);
     private final JLabel lblAviso = new JLabel(" ");
     private final JLabel subInv = sub(), subIns = sub(), subEmp = sub(), subRep = sub(), subTic = sub(), subHis = sub();
@@ -68,12 +69,12 @@ public class FrmMenuAdmin extends JFrame {
 
         // ── Indicadores (.stats: auto-fit minmax(200px, 1fr), hueco 12) ──
         Rejilla stats = Rejilla.fija(200, 12, 78).autoAjuste();
-        stats.add(indicador("Ventas de hoy", lblVentas, null));
-        stats.add(indicador("Tickets cobrados", lblTickets, null));
+        stats.add(indicador("Ventas de hoy", lblVentas, null, null));
+        stats.add(indicador("Tickets cobrados", lblTickets, null, BarraLateral.Seccion.TICKETS));
         stats.add(alertaExistencias());
 
         // ── Accesos (.hg: auto-fit minmax(270px, 1fr), hueco 14) ─────────
-        Rejilla accesos = Rejilla.fija(270, 14, 112).autoAjuste();
+        Rejilla accesos = Rejilla.fija(270, 14, 132).autoAjuste();   // alto suficiente para título + 2 líneas de descripción + dato
         Tile principal = tile("Empezar a vender", "Abrir la caja, capturar productos y cobrar", null,
                 new Color(0xF09A2B), true, "cart", BarraLateral.Seccion.VENTAS);
         Rejilla.filaCompleta(principal);
@@ -115,14 +116,24 @@ public class FrmMenuAdmin extends JFrame {
     }
 
     /** .st2: tarjeta blanca con título pequeño y cifra grande. */
-    private static JPanel indicador(String titulo, JLabel valor, Color fondo) {
+    private JPanel indicador(String titulo, JLabel valor, Color fondo, BarraLateral.Seccion destino) {
         Tema.Redondo p = new Tema.Redondo(28, Tema.BLANCO, Tema.LINEA);
         p.setLayout(new GridLayout(0, 1, 0, 0));
         p.setBorder(BorderFactory.createEmptyBorder(10, 16, 10, 16));
         valor.setFont(Tema.titulo(Font.BOLD, 28));
         valor.setForeground(Tema.TINTA);
-        p.add(Tema.etiqueta(titulo, Font.PLAIN, 13, Tema.GRIS));
+        JLabel lblTitulo = Tema.etiqueta(titulo, Font.PLAIN, 13, Tema.GRIS);
+        p.add(lblTitulo);
         p.add(valor);
+        if (destino != null) {                       // clic en la tarjeta: abre esa sección
+            p.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+            java.awt.event.MouseAdapter ma = new java.awt.event.MouseAdapter() {
+                @Override public void mouseClicked(java.awt.event.MouseEvent e) { BarraLateral.irA(FrmMenuAdmin.this, destino); }
+                @Override public void mouseEntered(java.awt.event.MouseEvent e) { p.colores(Tema.BLANCO, Tema.AMBAR); }
+                @Override public void mouseExited(java.awt.event.MouseEvent e) { p.colores(Tema.BLANCO, Tema.LINEA); }
+            };
+            for (java.awt.Component c : new java.awt.Component[]{p, lblTitulo, valor}) c.addMouseListener(ma);
+        }
         return p;
     }
 
@@ -138,10 +149,10 @@ public class FrmMenuAdmin extends JFrame {
         cardAlerta.add(lblAlerta);
         java.awt.event.MouseAdapter ma = new java.awt.event.MouseAdapter() {
             @Override public void mouseClicked(java.awt.event.MouseEvent e) {
-                if (cardAlerta.getClientProperty("warn") != null) BarraLateral.irA(FrmMenuAdmin.this, BarraLateral.Seccion.INVENTARIO);
+                if (cardAlerta.getClientProperty("warn") != null) BarraLateral.irA(FrmMenuAdmin.this, destinoAlerta);
             }
             @Override public void mouseEntered(java.awt.event.MouseEvent e) {
-                if (cardAlerta.getClientProperty("warn") != null) cardAlerta.colores(new Color(0xFDE8C4), Tema.AMBAR);
+                if (cardAlerta.getClientProperty("warn") != null) cardAlerta.colores(Tema.ROJO_SUAVE, Tema.ROJO);
             }
             @Override public void mouseExited(java.awt.event.MouseEvent e) { pintarAlerta(cardAlerta.getClientProperty("warn") != null); }
         };
@@ -149,11 +160,31 @@ public class FrmMenuAdmin extends JFrame {
         return cardAlerta;
     }
 
+    /** Triángulo de advertencia dibujado (la fuente de Swing no trae el símbolo ⚠ y salía un cuadrito vacío). */
+    private static javax.swing.Icon iconoAdvertencia(Color c) {
+        return new javax.swing.Icon() {
+            @Override public void paintIcon(java.awt.Component comp, java.awt.Graphics g0, int x, int y) {
+                java.awt.Graphics2D g = (java.awt.Graphics2D) g0.create();
+                g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(c);
+                g.fillPolygon(new int[]{x + 7, x + 14, x}, new int[]{y, y + 13, y + 13}, 3);
+                g.setColor(Color.WHITE);
+                g.fillRect(x + 6, y + 4, 2, 5);
+                g.fillRect(x + 6, y + 10, 2, 2);
+                g.dispose();
+            }
+            @Override public int getIconWidth() { return 15; }
+            @Override public int getIconHeight() { return 14; }
+        };
+    }
+
     private void pintarAlerta(boolean hay) {
         cardAlerta.putClientProperty("warn", hay ? Boolean.TRUE : null);
-        cardAlerta.colores(hay ? new Color(0xFDE8C4) : Tema.BLANCO, hay ? new Color(0xF0CF93) : Tema.LINEA);
-        lblAlertaTit.setForeground(hay ? Tema.AMBAR_TEXTO : Tema.GRIS);
-        lblAlerta.setForeground(hay ? Tema.AMBAR_TEXTO : Tema.TINTA);
+        cardAlerta.colores(hay ? Tema.ROJO_SUAVE : Tema.BLANCO, hay ? new Color(0xF0B8B0) : Tema.LINEA);
+        lblAlertaTit.setForeground(hay ? Tema.ROJO : Tema.GRIS);
+        lblAlertaTit.setIcon(hay ? iconoAdvertencia(Tema.ROJO) : null);
+        lblAlertaTit.setIconTextGap(6);
+        lblAlerta.setForeground(hay ? Tema.ROJO : Tema.TINTA);
         cardAlerta.setCursor(java.awt.Cursor.getPredefinedCursor(hay ? java.awt.Cursor.HAND_CURSOR : java.awt.Cursor.DEFAULT_CURSOR));
     }
 
@@ -256,7 +287,8 @@ public class FrmMenuAdmin extends JFrame {
                     try (PreparedStatement ps = con.prepareStatement(
                             "SELECT COUNT(*), ISNULL(SUM(Total), 0) FROM dbo.Ventas WHERE CAST(FechaHora AS DATE) = CAST(GETDATE() AS DATE)");
                          ResultSet rs = ps.executeQuery()) { rs.next(); r[0] = String.valueOf(rs.getInt(1)); r[1] = TicketService.money(rs.getDouble(2)); }
-                    r[2] = String.valueOf(InventarioService.lowCount(con));
+                    r[2] = String.valueOf(InventarioService.productosBajos(con));
+                    r[8] = String.valueOf(InventarioService.insumosBajos(con));
                     r[3] = escalar(con, "SELECT COUNT(*) FROM dbo.Insumos");
                     r[4] = escalar(con, "SELECT COUNT(*) FROM dbo.Empleados");
                     r[5] = escalar(con, "SELECT COUNT(*) FROM dbo.Ventas");
@@ -279,12 +311,13 @@ public class FrmMenuAdmin extends JFrame {
                             : "⚠ Falta actualizar la base de datos (" + r[7] + "). Ejecuta sql/00_instalar_todo.sql en SQL Server, base RefresqueríaLaPalma.");
                     lblTickets.setText(r[0]);
                     lblVentas.setText(r[1]);
-                    int low = Integer.parseInt(r[2]);
-                    lblAlertaTit.setText(low > 0 ? "⚠ Por reponer" : "Existencias");
+                    int lowProd = Integer.parseInt(r[2]), lowIns = Integer.parseInt(r[8]), low = lowProd + lowIns;
+                    destinoAlerta = lowProd == 0 && lowIns > 0 ? BarraLateral.Seccion.INSUMOS : BarraLateral.Seccion.INVENTARIO;
+                    lblAlertaTit.setText(low > 0 ? "Por reponer" : "Existencias");
                     lblAlerta.setText(low > 0 ? low + (low == 1 ? " artículo" : " artículos") : "Todo en orden");
                     pintarAlerta(low > 0);
-                    subInv.setText(low > 0 ? low + " por reponer" : "Todo en orden");
-                    subIns.setText(r[3] + " insumos");
+                    subInv.setText(lowProd > 0 ? lowProd + " por reponer" : "Todo en orden");
+                    subIns.setText(lowIns > 0 ? lowIns + " por reponer" : r[3] + " insumos");
                     subEmp.setText(r[4] + " cuentas");
                     subRep.setText(r[0] + " ventas hoy");
                     subTic.setText(r[5] + " tickets");

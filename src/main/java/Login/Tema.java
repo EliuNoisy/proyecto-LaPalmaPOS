@@ -225,6 +225,24 @@ public final class Tema {
         b.addItemListener(e -> b.setForeground(b.isSelected() ? BLANCO : PALMA));
     }
 
+    /** Triángulo de advertencia dibujado (la fuente de Swing no trae el símbolo ⚠ y salía un cuadrito vacío). */
+    public static javax.swing.Icon iconoAdvertencia(Color c) {
+        return new javax.swing.Icon() {
+            @Override public void paintIcon(java.awt.Component comp, Graphics g0, int x, int y) {
+                Graphics2D g = (Graphics2D) g0.create();
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(c);
+                g.fillPolygon(new int[]{x + 7, x + 14, x}, new int[]{y, y + 13, y + 13}, 3);
+                g.setColor(Color.WHITE);
+                g.fillRect(x + 6, y + 4, 2, 5);
+                g.fillRect(x + 6, y + 10, 2, 2);
+                g.dispose();
+            }
+            @Override public int getIconWidth() { return 15; }
+            @Override public int getIconHeight() { return 14; }
+        };
+    }
+
     // ── Panel redondeado ──────────────────────────────────────────────────
     public static class Redondo extends JPanel {
         private final int arco;
@@ -242,11 +260,14 @@ public final class Tema {
         @Override protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            // El trazo de 1 px se centra en el borde de la figura: se mete medio píxel para que no se recorte arriba/izquierda
+            java.awt.geom.RoundRectangle2D.Float forma = new java.awt.geom.RoundRectangle2D.Float(
+                    0.5f, 0.5f, getWidth() - 1f, getHeight() - 1f, arco, arco);
             g2.setColor(relleno);
-            g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, arco, arco);
+            g2.fill(forma);
             if (borde != null) {
                 g2.setColor(borde);
-                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, arco, arco);
+                g2.draw(forma);
             }
             g2.dispose();
             super.paintComponent(g);
@@ -609,7 +630,19 @@ public final class Tema {
         lista.setSelectionBackground(MENTA_SUAVE);
         lista.setSelectionForeground(TINTA);
         lista.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
-        popup.add(lista);
+        // La lista ocupa todo el ancho del menú y el texto sale pegado a la izquierda, como en el campo
+        popup.setLayout(new BorderLayout());
+        popup.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(LINEA), BorderFactory.createEmptyBorder(2, 2, 2, 2)));
+        lista.setCellRenderer(new javax.swing.DefaultListCellRenderer() {
+            @Override public Component getListCellRendererComponent(javax.swing.JList<?> l, Object v, int i, boolean sel, boolean foc) {
+                super.getListCellRendererComponent(l, v, i, sel, foc);
+                setBorder(BorderFactory.createEmptyBorder(0, 14, 0, 14));
+                setHorizontalAlignment(javax.swing.SwingConstants.LEFT);
+                return this;
+            }
+        });
+        popup.add(lista, BorderLayout.CENTER);
         final boolean[] ajustando = {false};
 
         Runnable elegir = () -> {
@@ -651,6 +684,7 @@ public final class Tema {
             if (modelo.isEmpty() || !campo.isShowing()) { popup.setVisible(false); return; }
             lista.setSelectedIndex(-1);
             popup.setPopupSize(Math.max(campo.getWidth(), 280), modelo.size() * 38 + 12);
+            lista.setPreferredSize(null);
             if (!popup.isVisible()) popup.show(campo, 0, campo.getHeight() + 2);
             popup.pack();
             campo.requestFocusInWindow();
@@ -728,5 +762,121 @@ public final class Tema {
         d.setLocationRelativeTo(padre);
         d.setVisible(true);
         return ok[0];
+    }
+
+    // ── Aviso de existencias con el diseño de La Palma ────────────────────
+    /**
+     * Aviso amable y claro (sin tecnicismos). El texto llega en líneas:
+     *   1.ª línea = lo más importante · 2.ª = explicación sencilla ·
+     *   «Etiqueta: valor» = datos en una cajita · «Qué hacer: …» = consejo.
+     * Una sola línea corta se muestra como titular.
+     */
+    public static void avisoExistencias(Component padre, String mensaje) {
+        String[] lin = (mensaje == null ? "" : mensaje).split("\n");
+        String titular = lin[0].trim(), explica = "";
+        int desde = 1;
+        if (lin.length == 1 && titular.length() > 60) { explica = titular; titular = "No se pudo agregar"; desde = 1; }
+        else if (lin.length > 1 && !lin[1].contains(": ")) { explica = lin[1].trim(); desde = 2; }
+        java.util.List<String[]> datos = new java.util.ArrayList<>();
+        String consejo = null;
+        for (int i = desde; i < lin.length; i++) {
+            int k = lin[i].indexOf(": ");
+            if (k < 0) continue;
+            String et = lin[i].substring(0, k).trim(), val = lin[i].substring(k + 2).trim();
+            if (et.equals("Qué hacer")) consejo = val; else datos.add(new String[]{et, val});
+        }
+
+        java.awt.Window w = padre == null ? null : SwingUtilities.getWindowAncestor(padre);
+        if (w == null && padre instanceof java.awt.Window) w = (java.awt.Window) padre;
+        final javax.swing.JDialog d = new javax.swing.JDialog(w, "Aviso", java.awt.Dialog.ModalityType.APPLICATION_MODAL);
+        d.setUndecorated(true);
+
+        // icono: círculo ámbar con «!»
+        JPanel icono = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(AMBAR_SUAVE); g2.fillOval(0, 0, 56, 56);
+                g2.setColor(AMBAR); g2.fillOval(8, 8, 40, 40);
+                g2.setColor(BLANCO); g2.setFont(fuente(Font.BOLD, 26));
+                java.awt.FontMetrics fm = g2.getFontMetrics();
+                g2.drawString("!", 28 - fm.stringWidth("!") / 2, 28 + (fm.getAscent() - fm.getDescent()) / 2);
+                g2.dispose();
+            }
+        };
+        icono.setOpaque(false);
+        icono.setPreferredSize(new Dimension(56, 56));
+        JPanel izq = new JPanel(new BorderLayout());
+        izq.setOpaque(false);
+        izq.add(icono, BorderLayout.NORTH);
+
+        JPanel centro = new JPanel();
+        centro.setOpaque(false);
+        centro.setLayout(new javax.swing.BoxLayout(centro, javax.swing.BoxLayout.Y_AXIS));
+        JLabel t = etiqueta("<html><div style='width:340px'>" + titular + "</div></html>", Font.BOLD, 20, TINTA);
+        t.setAlignmentX(Component.LEFT_ALIGNMENT);
+        centro.add(t);
+        if (!explica.isEmpty()) {
+            centro.add(javax.swing.Box.createVerticalStrut(8));
+            JLabel e = etiqueta("<html><div style='width:340px'>" + explica + "</div></html>", Font.PLAIN, 15, GRIS);
+            e.setAlignmentX(Component.LEFT_ALIGNMENT);
+            centro.add(e);
+        }
+        if (!datos.isEmpty()) {
+            centro.add(javax.swing.Box.createVerticalStrut(14));
+            Redondo caja = new Redondo(14, AMBAR_SUAVE, null);
+            caja.setLayout(new java.awt.GridLayout(datos.size(), 1, 0, 6));
+            caja.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
+            for (String[] f : datos) {
+                JPanel fila = new JPanel(new BorderLayout(12, 0));
+                fila.setOpaque(false);
+                fila.add(etiqueta(f[0], Font.PLAIN, 14, AMBAR_TEXTO), BorderLayout.WEST);
+                JLabel v = etiqueta(f[1], Font.BOLD, 15, TINTA);
+                v.setHorizontalAlignment(SwingConstants.RIGHT);
+                fila.add(v, BorderLayout.EAST);
+                caja.add(fila);
+            }
+            caja.setAlignmentX(Component.LEFT_ALIGNMENT);
+            centro.add(caja);
+        }
+        if (consejo != null) {
+            centro.add(javax.swing.Box.createVerticalStrut(12));
+            Redondo tip = new Redondo(14, new Color(0xDCEFEA), null);
+            tip.setLayout(new BorderLayout());
+            tip.setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
+            tip.add(etiqueta("<html><div style='width:312px'><b>Qué puedes hacer:</b> " + consejo + "</div></html>", Font.PLAIN, 14, TINTA));
+            tip.setAlignmentX(Component.LEFT_ALIGNMENT);
+            centro.add(tip);
+        }
+
+        JButton ok = exito(new JButton("Entendido"));
+        ok.setFont(fuente(Font.BOLD, 16));
+        ok.setPreferredSize(new Dimension(170, 46));
+        ok.addActionListener(e -> d.dispose());
+        JPanel botones = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 0, 0));
+        botones.setOpaque(false);
+        botones.add(ok);
+
+        Redondo tarjeta = new Redondo(22, BLANCO, LINEA);
+        tarjeta.setLayout(new BorderLayout(18, 18));
+        tarjeta.setBorder(BorderFactory.createEmptyBorder(26, 26, 22, 26));
+        tarjeta.add(izq, BorderLayout.WEST);
+        tarjeta.add(centro, BorderLayout.CENTER);
+        tarjeta.add(botones, BorderLayout.SOUTH);
+        JPanel marco = new JPanel(new BorderLayout());
+        marco.setBackground(ARENA);
+        marco.setBorder(BorderFactory.createLineBorder(TEAL, 1));
+        JPanel pad = new JPanel(new BorderLayout());
+        pad.setOpaque(false);
+        pad.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        pad.add(tarjeta);
+        marco.add(pad);
+        d.setContentPane(marco);
+        d.getRootPane().setDefaultButton(ok);
+        d.getRootPane().registerKeyboardAction(e -> d.dispose(), javax.swing.KeyStroke.getKeyStroke("ESCAPE"),
+                javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW);
+        d.pack();
+        d.setLocationRelativeTo(padre);
+        d.setVisible(true);
     }
 }

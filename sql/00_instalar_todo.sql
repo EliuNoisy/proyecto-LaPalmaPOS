@@ -80,7 +80,7 @@ GO
     (N'Nieve','g',8000),(N'Vaso chico','pieza',50),(N'Vaso mediano','pieza',50),(N'Vaso grande','pieza',40),
     (N'Cono de oblea','pieza',40),(N'Cono de galleta','pieza',40),(N'Pepino','g',1500),(N'Jícama','g',1500),
     (N'Fresa','g',2000),(N'Crema','g',1500),(N'Hielo','g',10000),(N'Jarabe','g',2000),
-    (N'Churritos','g',1500),(N'Bolsa de Sabritas','pieza',40)
+    (N'Churritos','g',1500),(N'Bolsa de Cheetos','pieza',0),(N'Bolsa de Chips','pieza',0),(N'Bolsa de Doritos','pieza',0),(N'Bolsa de Tostitos','pieza',0)
     ) v(Nombre, Unidad, Existencias)
 )
 INSERT INTO dbo.Insumos (Nombre, Unidad, Existencias)
@@ -128,7 +128,7 @@ BEGIN
         (N'Nieve','g',8000),(N'Vaso chico','pieza',50),(N'Vaso mediano','pieza',50),(N'Vaso grande','pieza',40),
         (N'Cono de oblea','pieza',40),(N'Cono de galleta','pieza',40),(N'Pepino','g',1500),(N'Jícama','g',1500),
         (N'Fresa','g',2000),(N'Crema','g',1500),(N'Hielo','g',10000),(N'Jarabe','g',2000),
-        (N'Churritos','g',1500),(N'Bolsa de Sabritas','pieza',40)
+        (N'Churritos','g',1500),(N'Bolsa de Cheetos','pieza',0),(N'Bolsa de Chips','pieza',0),(N'Bolsa de Doritos','pieza',0),(N'Bolsa de Tostitos','pieza',0)
         ) v(Nombre, Unidad, Existencias))
     INSERT INTO dbo.Insumos (Nombre, Unidad, Existencias)
     SELECT s.Nombre, s.Unidad, s.Existencias FROM s
@@ -161,9 +161,10 @@ BEGIN
     ('RA',N'Hielo',200),('RA',N'Jarabe',50),
     ('TO',N'Totopos',80),('TO',N'Cacahuate',20),('TO',N'Pepino',40),('TO',N'Jícama',40),('TO',N'Salsa roja',20),
     ('CL',N'Churritos',80),('CL',N'Pepino',40),('CL',N'Jícama',40),('CL',N'Cacahuate',20),('CL',N'Salsa roja',20),
-    ('SC',N'Bolsa de Sabritas',1),('SC',N'Carne',100),('SC',N'Queso',20),('SC',N'Salsa roja',15),
-    ('SQ',N'Bolsa de Sabritas',1),('SQ',N'Queso',50),('SQ',N'Salsa roja',15),
-    ('OB',N'Tortilla para chalupa',1),('OB',N'Carne',80),('OB',N'Queso',30),('OB',N'Lechuga',10),('OB',N'Salsa roja',10);
+    ('SC',N'Carne',100),('SC',N'Queso',20),('SC',N'Salsa roja',15),
+    ('SQ',N'Queso',50),('SQ',N'Salsa roja',15),
+    ('OB',N'Tortilla para chalupa',1),('OB',N'Carne',80),('OB',N'Queso',30),('OB',N'Lechuga',10),('OB',N'Salsa roja',10),
+    ('BCH',N'Bolsa de Cheetos',1),('BCP',N'Bolsa de Chips',1),('BDO',N'Bolsa de Doritos',1),('BTO',N'Bolsa de Tostitos',1);
 
     DECLARE @Pat TABLE (Orden INT IDENTITY(1,1), Pat NVARCHAR(80), Tipo VARCHAR(10), Base VARCHAR(4),
                         Papas BIT, Mult DECIMAL(4,2), Bolas INT, Cont NVARCHAR(30));
@@ -193,7 +194,10 @@ BEGIN
     (N'Sabritas%carne%','preparado','SC',0,1,NULL,NULL),
     (N'Sabritas%salchicha%','preparado','SC',0,1,NULL,NULL),
     (N'Sabritas%queso%','preparado','SQ',0,1,NULL,NULL),
-    (N'Obispos%','preparado','OB',0,1,NULL,NULL);
+    (N'Obispos%','preparado','OB',0,1,NULL,NULL),
+    -- bolsas «solas»: se venden con receta de 1 bolsa, así hay UN solo conteo por marca (el insumo)
+    (N'Cheetos%solo%','preparado','BCH',0,1,NULL,NULL),(N'Chips%solo%','preparado','BCP',0,1,NULL,NULL),
+    (N'Doritos%solo%','preparado','BDO',0,1,NULL,NULL),(N'Tostitos%solo%','preparado','BTO',0,1,NULL,NULL);
 
     DECLARE @M TABLE (ProductoID INT PRIMARY KEY, Orden INT);
     INSERT @M (ProductoID, Orden)
@@ -209,6 +213,16 @@ BEGIN
     JOIN @M m ON m.ProductoID = p.id
     JOIN @Pat pt ON pt.Orden = m.Orden AND pt.Tipo = 'nieve'
     JOIN dbo.Insumos i ON i.Nombre = pt.Cont;
+
+    -- bolsas «solas»: las que ya tenías contadas en el producto pasan al insumo de su marca (una sola vez,
+    -- porque solo entran productos directos sin receta). Desde ahí el conteo vale por el insumo; la cantidad
+    -- del producto deja de usarse (la pantalla de Inventario muestra las bolsas que alcanzan).
+    UPDATE i SET Existencias = i.Existencias + p.cantidad
+    FROM @M m
+    JOIN @Pat pt ON pt.Orden = m.Orden AND pt.Base IN ('BCH','BCP','BDO','BTO')
+    JOIN @Rec r ON r.Base = pt.Base
+    JOIN dbo.Insumos i ON i.Nombre = r.Insumo
+    JOIN dbo.Productos p ON p.id = m.ProductoID;
 
     -- preparados: receta base (x multiplicador)
     INSERT dbo.Recetas (ProductoID, InsumoID, Cantidad)
@@ -273,6 +287,7 @@ BEGIN
         COMMIT;
         BEGIN TRY DBCC CHECKIDENT ('dbo.Ventas', RESEED, 0) WITH NO_INFOMSGS; END TRY BEGIN CATCH END CATCH
         EXEC dbo.sp_SembrarRecetas;
+        IF OBJECT_ID('dbo.sp_BolsasSolasPreparadas') IS NOT NULL EXEC dbo.sp_BolsasSolasPreparadas;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK;
@@ -303,6 +318,126 @@ IF COL_LENGTH('dbo.Productos', 'Eliminado') IS NULL
 GO
 GO
 
+-- ===== 06_stock_minimo.sql =====
+-- 06: stock mínimo PERSONALIZADO por producto.
+-- El administrador fija el límite de cada producto desde Inventario > «Stock mínimo».
+-- Cuando las existencias llegan a ese límite (o bajan de él) el sistema avisa «por reponer».
+-- Los productos ya existentes quedan con 5, que era el límite general de antes. Es seguro volver a correrlo.
+IF COL_LENGTH('dbo.Productos', 'StockMinimo') IS NULL
+    ALTER TABLE dbo.Productos ADD StockMinimo INT NOT NULL
+        CONSTRAINT DF_Productos_StockMinimo DEFAULT 5
+        CONSTRAINT CK_Productos_StockMinimo CHECK (StockMinimo >= 0 AND StockMinimo <= 99999);
+GO
+GO
+
+-- ===== 07_stock_minimo_insumos.sql =====
+-- 07: stock mínimo PERSONALIZADO por insumo (igual que el de los productos, sql/06).
+-- El administrador fija el límite de cada insumo desde «Insumos y recetas» > «Stock mínimo».
+-- Cuando las existencias llegan a ese límite (o bajan de él) el sistema avisa «por reponer».
+-- Los insumos que ya existían quedan con el límite general de antes: 5 si se cuentan por pieza y 300 si se pesan en gramos.
+-- Es seguro volver a correrlo.
+IF COL_LENGTH('dbo.Insumos', 'StockMinimo') IS NULL
+BEGIN
+    ALTER TABLE dbo.Insumos ADD StockMinimo INT NOT NULL
+        CONSTRAINT DF_Insumos_StockMinimo DEFAULT 5
+        CONSTRAINT CK_Insumos_StockMinimo CHECK (StockMinimo >= 0 AND StockMinimo <= 99999);
+    EXEC (N'UPDATE dbo.Insumos SET StockMinimo = 300 WHERE Unidad <> ''pieza''');
+END
+GO
+GO
+
+-- ===== 08_bolsas_solas_y_preparadas.sql =====
+-- 08: Bolsas de botana «solas» y «preparadas» (Cheetos, Chips, Doritos, Tostitos y Sabritas).
+-- En la caja salen DOS productos por marca con precio distinto (ej. «Doritos (solos)» y «Doritos preparados»),
+-- pero los dos descuentan 1 pieza del MISMO insumo «Bolsa de Doritos». Así el inventario nunca se desfasa
+-- por vender «solo» o «preparado». Las «Sabritas con carne / queso / salchicha...» también gastan 1 «Bolsa de Sabritas».
+-- Ejecutar DESPUÉS de 02 y 03 (o todo junto con 00_instalar_todo.sql). Es seguro volver a correrlo:
+-- no duplica productos ni recetas y no toca los precios que ya hayas puesto.
+-- Los productos nuevos nacen con el precio de las bolsas «solas»: cámbialo en Inventario > Modificar producto.
+IF COL_LENGTH('dbo.Productos', 'Categoria') IS NULL
+    ALTER TABLE dbo.Productos ADD Categoria NVARCHAR(30) NOT NULL CONSTRAINT DF_Productos_Categoria DEFAULT 'Comida';
+GO
+IF COL_LENGTH('dbo.Productos', 'Eliminado') IS NULL
+    ALTER TABLE dbo.Productos ADD Eliminado BIT NOT NULL CONSTRAINT DF_Productos_Eliminado DEFAULT 0;
+GO
+
+CREATE OR ALTER PROCEDURE dbo.sp_BolsasSolasPreparadas AS
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @C NVARCHAR(40) = N'Latin1_General_CI_AI';
+
+    DECLARE @M TABLE (Marca NVARCHAR(20) PRIMARY KEY, Insumo NVARCHAR(30), Sola NVARCHAR(40), Prep NVARCHAR(40));
+    INSERT @M VALUES
+      (N'Cheetos', N'Bolsa de Cheetos', N'Cheetos (solos)',  N'Cheetos preparados'),
+      (N'Chips',   N'Bolsa de Chips',   N'Chips (solos)',    N'Chips preparados'),
+      (N'Doritos', N'Bolsa de Doritos', N'Doritos (solos)',  N'Doritos preparados'),
+      (N'Tostitos',N'Bolsa de Tostitos',N'Tostitos (solos)', N'Tostitos preparados'),
+      (N'Sabritas',N'Bolsa de Sabritas',N'Sabritas (solas)', N'Sabritas preparadas');
+
+    -- 1) El insumo «Bolsa de ...» de cada marca (si ya lo tienes, no se toca)
+    INSERT dbo.Insumos (Nombre, Unidad, Existencias)
+    SELECT m.Insumo, 'pieza', 0 FROM @M m
+    WHERE NOT EXISTS (SELECT 1 FROM dbo.Insumos i WHERE i.Nombre = m.Insumo);
+
+    -- 2) Los productos «solos» y «preparados» de cada marca (solo se crean los que falten)
+    DECLARE @Base DECIMAL(10,2) = ISNULL((SELECT MAX(p.Precio) FROM dbo.Productos p
+        WHERE p.Eliminado = 0 AND p.Nombre_Producto COLLATE Latin1_General_CI_AI LIKE N'%solo%'), 20);
+
+    INSERT dbo.Productos (Nombre_Producto, Precio, Cantidad, Categoria)
+    SELECT v.Nombre, ISNULL(v.PrecioSolo, @Base), 0, N'Snacks'
+    FROM (
+        SELECT m.Marca, m.Sola AS Nombre, N'sola' AS Clase,
+               (SELECT MAX(p.Precio) FROM dbo.Productos p WHERE p.Eliminado = 0 AND p.Nombre_Producto COLLATE Latin1_General_CI_AI LIKE m.Marca + N'%sol[ao]%') AS PrecioSolo
+        FROM @M m
+        UNION ALL
+        -- «preparados»: solo existe «Sabritas preparadas»; en la caja pregunta la marca o sabor de la bolsa
+        -- (ya no se crean «Cheetos/Chips/Doritos/Tostitos preparados» por separado)
+        SELECT m.Marca, m.Prep, N'prep',
+               (SELECT MAX(p.Precio) FROM dbo.Productos p WHERE p.Eliminado = 0 AND p.Nombre_Producto COLLATE Latin1_General_CI_AI LIKE m.Marca + N'%sol[ao]%')
+        FROM @M m WHERE m.Marca = N'Sabritas'
+    ) v
+    WHERE NOT EXISTS (
+        SELECT 1 FROM dbo.Productos p
+        WHERE p.Eliminado = 0 AND p.Nombre_Producto COLLATE Latin1_General_CI_AI LIKE
+              v.Marca + CASE v.Clase WHEN N'sola' THEN N'%sol[ao]%' ELSE N'%preparad%' END);
+
+    -- 3) Todos los productos de bolsa (solos / preparados) y las «Sabritas con ...» llevan la bolsa en su receta
+    DECLARE @P TABLE (ProductoID INT PRIMARY KEY, InsumoID INT, EraDirecto BIT, Cant INT);
+    INSERT @P (ProductoID, InsumoID, EraDirecto, Cant)
+    SELECT p.id, i.InsumoID,
+           CASE WHEN p.Tipo = 'directo' AND NOT EXISTS (SELECT 1 FROM dbo.Recetas r WHERE r.ProductoID = p.id) THEN 1 ELSE 0 END,
+           p.Cantidad
+    FROM dbo.Productos p
+    JOIN @M m ON p.Nombre_Producto COLLATE Latin1_General_CI_AI LIKE m.Marca + N'%sol[ao]%'
+              OR p.Nombre_Producto COLLATE Latin1_General_CI_AI LIKE m.Marca + N'%preparad%'
+              OR (m.Marca = N'Sabritas' AND p.Nombre_Producto COLLATE Latin1_General_CI_AI LIKE N'Sabritas con%')
+    JOIN dbo.Insumos i ON i.Nombre = m.Insumo
+    WHERE p.Eliminado = 0 AND p.Tipo <> 'nieve';
+
+    -- si el administrador ya tenía bolsas contadas en un producto «solo/preparado» directo, pasan al insumo (una sola vez)
+    UPDATE i SET Existencias = CASE WHEN i.Existencias + x.Total > 99999 THEN 99999 ELSE i.Existencias + x.Total END
+    FROM dbo.Insumos i
+    JOIN (SELECT p.InsumoID, SUM(p.Cant) AS Total FROM @P p JOIN dbo.Productos pr ON pr.id = p.ProductoID
+          WHERE p.EraDirecto = 1 AND pr.Nombre_Producto COLLATE Latin1_General_CI_AI NOT LIKE N'Sabritas con%'
+          GROUP BY p.InsumoID) x ON x.InsumoID = i.InsumoID;
+    UPDATE pr SET Cantidad = 0
+    FROM dbo.Productos pr JOIN @P p ON p.ProductoID = pr.id
+    WHERE p.EraDirecto = 1 AND pr.Nombre_Producto COLLATE Latin1_General_CI_AI NOT LIKE N'Sabritas con%';
+
+    INSERT dbo.Recetas (ProductoID, InsumoID, Cantidad)
+    SELECT p.ProductoID, p.InsumoID, 1 FROM @P p
+    WHERE NOT EXISTS (SELECT 1 FROM dbo.Recetas r WHERE r.ProductoID = p.ProductoID AND r.InsumoID = p.InsumoID);
+
+    UPDATE pr SET Tipo = 'preparado'
+    FROM dbo.Productos pr JOIN @P p ON p.ProductoID = pr.id
+    WHERE pr.Tipo = 'directo';
+END
+GO
+
+EXEC dbo.sp_BolsasSolasPreparadas;
+GO
+GO
+
 -- ===== VERIFICACIÓN =====
 SELECT Pieza, CASE WHEN Existe = 1 THEN 'OK' ELSE 'FALTA' END AS Estado FROM (VALUES
  ('Tabla Insumos',            CASE WHEN OBJECT_ID('dbo.Insumos')   IS NULL THEN 0 ELSE 1 END),
@@ -313,10 +448,33 @@ SELECT Pieza, CASE WHEN Existe = 1 THEN 'OK' ELSE 'FALTA' END AS Estado FROM (VA
  ('Productos.Bolas',          CASE WHEN COL_LENGTH('dbo.Productos','Bolas') IS NULL THEN 0 ELSE 1 END),
  ('Productos.ContenedorID',   CASE WHEN COL_LENGTH('dbo.Productos','ContenedorID') IS NULL THEN 0 ELSE 1 END),
  ('Productos.Eliminado',      CASE WHEN COL_LENGTH('dbo.Productos','Eliminado') IS NULL THEN 0 ELSE 1 END),
+ ('Productos.StockMinimo',    CASE WHEN COL_LENGTH('dbo.Productos','StockMinimo') IS NULL THEN 0 ELSE 1 END),
+ ('Insumos.StockMinimo',       CASE WHEN COL_LENGTH('dbo.Insumos','StockMinimo') IS NULL THEN 0 ELSE 1 END),
  ('Ventas.MetodoPago',        CASE WHEN COL_LENGTH('dbo.Ventas','MetodoPago') IS NULL THEN 0 ELSE 1 END),
  ('Ventas.MontoTarjeta',      CASE WHEN COL_LENGTH('dbo.Ventas','MontoTarjeta') IS NULL THEN 0 ELSE 1 END),
  ('Ventas.Empleado',          CASE WHEN COL_LENGTH('dbo.Ventas','Empleado') IS NULL THEN 0 ELSE 1 END),
  ('Procedimiento Restaurar',  CASE WHEN OBJECT_ID('dbo.sp_RestaurarSistema') IS NULL THEN 0 ELSE 1 END),
  ('Insumos cargados',         CASE WHEN OBJECT_ID('dbo.Insumos') IS NOT NULL AND EXISTS (SELECT 1 FROM dbo.Insumos) THEN 1 ELSE 0 END)
 ) v(Pieza, Existe);
+GO
+
+-- ===== 09_quitar_preparados_por_marca.sql =====
+
+-- 09: Quita los «preparados» por marca (Cheetos, Chips, Doritos y Tostitos preparados).
+-- Ahora «Sabritas preparadas» (y «Sabritas con ...») preguntan en la caja la marca o sabor de la bolsa.
+-- Sin ventas se borran; con ventas quedan marcados como eliminados (las ventas viejas siguen completas en reportes y tickets).
+-- Es seguro volver a correrlo.
+DECLARE @Q TABLE (id INT PRIMARY KEY, Ventas BIT);
+INSERT @Q (id, Ventas)
+SELECT p.id, CASE WHEN EXISTS (SELECT 1 FROM dbo.DetalleVentas d WHERE d.ProductoID = p.id) THEN 1 ELSE 0 END
+FROM dbo.Productos p
+WHERE p.Eliminado = 0
+  AND (p.Nombre_Producto COLLATE Latin1_General_CI_AI LIKE N'Cheetos%preparad%'
+    OR p.Nombre_Producto COLLATE Latin1_General_CI_AI LIKE N'Chips%preparad%'
+    OR p.Nombre_Producto COLLATE Latin1_General_CI_AI LIKE N'Doritos%preparad%'
+    OR p.Nombre_Producto COLLATE Latin1_General_CI_AI LIKE N'Tostitos%preparad%');
+DELETE FROM dbo.Recetas WHERE ProductoID IN (SELECT id FROM @Q);
+UPDATE p SET Eliminado = 1, Tipo = 'directo', Bolas = NULL, ContenedorID = NULL
+FROM dbo.Productos p JOIN @Q q ON q.id = p.id WHERE q.Ventas = 1;
+DELETE FROM dbo.Productos WHERE id IN (SELECT id FROM @Q WHERE Ventas = 0);
 GO

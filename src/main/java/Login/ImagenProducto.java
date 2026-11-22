@@ -26,6 +26,8 @@ public final class ImagenProducto {
     private ImagenProducto() { }
 
     public static final String PREFIJO = "archivo:";
+    /** Marca guardada en la columna Imagen cuando el administrador quitó la foto a propósito (para que no se busque una parecida). */
+    public static final String SIN_IMAGEN = "sin_imagen";
     private static final String CARPETA = "imagenes_productos";
     private static final int LADO_MAX = 600;                 // se guarda a lo mucho de 600 x 600
     private static final long MAX_BYTES = 15L * 1024 * 1024; // archivos de más de 15 MB se rechazan

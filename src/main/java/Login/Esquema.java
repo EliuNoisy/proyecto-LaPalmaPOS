@@ -15,7 +15,7 @@ public final class Esquema {
 
     private static final long REVISAR_CADA_MS = 5000;
     private static long ultimo = 0;
-    private static boolean insumos, pago, empleado, historial, eliminado;
+    private static boolean insumos, pago, empleado, historial, eliminado, stockMin, insumoMin;
 
     private static boolean existe(Connection con, String sql, String a, String b) {
         try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -46,8 +46,10 @@ public final class Esquema {
             empleado = col(con, "dbo.Ventas", "Empleado");
             historial = tabla(con, "dbo.Historial");
             eliminado = col(con, "dbo.Productos", "Eliminado");
+            stockMin = col(con, "dbo.Productos", "StockMinimo");
+            insumoMin = col(con, "dbo.Insumos", "StockMinimo");
         } catch (Exception e) {
-            insumos = pago = empleado = historial = eliminado = false;
+            insumos = pago = empleado = historial = eliminado = stockMin = insumoMin = false;
         }
         ultimo = ahora;
     }
@@ -58,6 +60,12 @@ public final class Esquema {
     public static boolean historialListo(){ revisar(); return historial; }
     /** Columna Productos.Eliminado (sql/05): permite eliminar productos que ya tienen ventas. */
     public static boolean eliminadoListo(){ revisar(); return eliminado; }
+
+    /** Columna Productos.StockMinimo (sql/06): límite mínimo personalizado de cada producto. */
+    public static boolean stockMinimoListo(){ revisar(); return stockMin; }
+
+    /** Columna Insumos.StockMinimo (sql/07): límite mínimo personalizado de cada insumo. */
+    public static boolean insumoMinimoListo(){ revisar(); return insumoMin; }
 
     /** Condición SQL para dejar fuera los productos eliminados («p» es el alias de la tabla Productos). */
     public static String activo(String alias) {
@@ -74,6 +82,8 @@ public final class Esquema {
         if (!empleado)  sb.append("vendedor en tickets, ");
         if (!historial) sb.append("historial de cambios, ");
         if (!eliminado) sb.append("eliminar productos con ventas, ");
+        if (!stockMin)  sb.append("stock mínimo por producto, ");
+        if (!insumoMin) sb.append("stock mínimo por insumo, ");
         if (sb.length() == 0) return "";
         return sb.substring(0, sb.length() - 2);
     }

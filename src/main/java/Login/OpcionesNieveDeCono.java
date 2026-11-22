@@ -146,7 +146,7 @@ private FrmRegistrarVentas parent;
 
     private void jBtnNieveEnConoDeObleaActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jBtnNieveEnConoDeObleaActionPerformed
         String id = "26";
-        String nombre = "Nieve de cono de oblea";
+        String nombre = "Nieve en cono de oblea";
         int cantidad = 1;
         double precio = 10.00;
 
@@ -157,7 +157,7 @@ private FrmRegistrarVentas parent;
 
     private void jBtnNieveEnConoDeGalletaActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jBtnNieveEnConoDeGalletaActionPerformed
         String id = "27";
-        String nombre = "Nieve de cono de galleta";
+        String nombre = "Nieve en cono de galleta";
         int cantidad = 1;
         double precio = 15.00;
 

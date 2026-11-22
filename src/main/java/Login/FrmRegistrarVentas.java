@@ -36,6 +36,9 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
         jTable1.getColumnModel().getColumn(0).setWidth(0);
         jTable1.getColumnModel().getColumn(0).setPreferredWidth(0);
 
+        // 5ª columna (insumo «Bolsa de ...» elegido): vive en el modelo pero no se ve en la tabla
+        if (jTable1.getColumnModel().getColumnCount() > 4) jTable1.removeColumn(jTable1.getColumnModel().getColumn(4));
+
         jTable1.getColumnModel().getColumn(1).setCellRenderer(new MultiLineCellRenderer());
 
         // Cant. y Precio con ancho fijo y cómodo; todo el espacio que sobra es para el nombre del producto
@@ -158,6 +161,97 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
         actualizarMontos();
     }
 
+    /** Carrito con el detalle de qué bolsa (marca/sabor) gasta cada botana. */
+    private static final class Carro {
+        final java.util.Map<Integer, Integer> carrito = new java.util.LinkedHashMap<>();
+        final java.util.Map<Integer, java.util.Map<String, Integer>> bolsas = new java.util.LinkedHashMap<>();
+        void sumar(int pid, String bolsa, int q) {
+            carrito.merge(pid, q, Integer::sum);
+            if (bolsa != null && !bolsa.isEmpty()) bolsas.computeIfAbsent(pid, k -> new java.util.LinkedHashMap<>()).merge(bolsa, q, Integer::sum);
+        }
+    }
+
+    private static String bolsaDeFila(DefaultTableModel m, int i) {
+        if (m.getColumnCount() < 5) return "";
+        Object o = m.getValueAt(i, 4);
+        return o == null ? "" : o.toString();
+    }
+
+    /**
+     * Arma el carrito de la tabla. Opcionalmente cambia la cantidad de una fila ({@code filaCambia}) o suma
+     * un artículo nuevo ({@code pidNuevo}) para revisar existencias ANTES de tocar la tabla.
+     */
+    private Carro armarCarro(int filaCambia, int nuevaCant, String pidNuevo, String bolsaNueva, int cantNueva) {
+        DefaultTableModel modelo = (DefaultTableModel) jTable1.getModel();
+        Carro c = new Carro();
+        for (int i = 0; i < modelo.getRowCount(); i++) {
+            int q = i == filaCambia ? nuevaCant : Integer.parseInt(modelo.getValueAt(i, 2).toString());
+            c.sumar(Integer.parseInt(modelo.getValueAt(i, 0).toString()), bolsaDeFila(modelo, i), q);
+        }
+        if (pidNuevo != null) c.sumar(Integer.parseInt(pidNuevo), bolsaNueva, cantNueva);
+        return c;
+    }
+
+    /**
+     * Si el producto es una botana que puede llevar bolsas de varias marcas o sabores, pregunta cuál.
+     * Devuelve {insumo, etiqueta}; {"", ""} si no hay nada que elegir; null si se canceló.
+     */
+    private String[] pedirBolsa(String nombreProducto) {
+        java.util.List<String[]> ops;
+        try (Connection con = capa.datos.ConexionSQL.getConexionSqlServer()) {
+            ops = InventarioService.opcionesBolsa(con, nombreProducto);
+        } catch (SQLException | NullPointerException ex) {
+            return new String[]{"", ""};   // sin conexión: se vende con la bolsa de siempre
+        }
+        if (ops.isEmpty()) return new String[]{"", ""};
+        final String[][] elegido = {null};
+        final javax.swing.JDialog d = new javax.swing.JDialog(this, "Elige la bolsa", true);
+        d.setUndecorated(true);
+        Tema.Redondo tarjeta = new Tema.Redondo(22, Tema.BLANCO, Tema.LINEA);
+        tarjeta.setLayout(new BorderLayout(0, 16));
+        tarjeta.setBorder(javax.swing.BorderFactory.createEmptyBorder(24, 26, 20, 26));
+        javax.swing.JLabel t = Tema.etiqueta("¿De qué marca o sabor es la bolsa?", java.awt.Font.BOLD, 22, Tema.TINTA);
+        javax.swing.JLabel st = Tema.etiqueta("Para «" + nombreProducto + "». Toca una opción.", java.awt.Font.PLAIN, 15, Tema.GRIS);
+        javax.swing.JPanel textos = new javax.swing.JPanel(new java.awt.GridLayout(2, 1, 0, 4));
+        textos.setOpaque(false);
+        textos.add(t); textos.add(st);
+        javax.swing.JPanel rejilla = new javax.swing.JPanel(new java.awt.GridLayout(0, 2, 12, 12));
+        rejilla.setOpaque(false);
+        for (String[] o : ops) {
+            int hay = Integer.parseInt(o[2]);
+            javax.swing.JButton b = new javax.swing.JButton(hay <= 0
+                    ? "<html><center><b>" + o[1] + "</b><br><span style='font-size:11px'>Agotado</span></center></html>"
+                    : "<html><center><b>" + o[1] + "</b></center></html>");
+            if (hay > 0) Tema.estilo(b, Tema.OK_SUAVE, Tema.PALMA_OSC, new java.awt.Color(0xB5E6D9));
+            else Tema.claro(b);
+            b.setEnabled(hay > 0);
+            b.setPreferredSize(new java.awt.Dimension(210, 66));
+            b.addActionListener(ev -> { elegido[0] = o; d.dispose(); });
+            rejilla.add(b);
+        }
+        javax.swing.JButton cancelar = new javax.swing.JButton("Cancelar");
+        cancelar.setFont(Tema.fuente(java.awt.Font.BOLD, 15));
+        Tema.estilo(cancelar, Tema.ROJO, Tema.BLANCO, Tema.ROJO.darker());
+        cancelar.setPreferredSize(new java.awt.Dimension(140, 46));
+        cancelar.addActionListener(ev -> d.dispose());
+        javax.swing.JPanel pie = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 0, 0));
+        pie.setOpaque(false);
+        pie.add(cancelar);
+        javax.swing.JScrollPane sp = new javax.swing.JScrollPane(rejilla);
+        sp.setBorder(null);
+        sp.setOpaque(false);
+        sp.getViewport().setOpaque(false);
+        sp.setPreferredSize(new java.awt.Dimension(460, Math.min(330, 78 * ((ops.size() + 1) / 2))));
+        tarjeta.add(textos, BorderLayout.NORTH);
+        tarjeta.add(sp, BorderLayout.CENTER);
+        tarjeta.add(pie, BorderLayout.SOUTH);
+        d.setContentPane(tarjeta);
+        d.pack();
+        d.setLocationRelativeTo(this);
+        d.setVisible(true);
+        return elegido[0] == null ? null : new String[]{elegido[0][0], elegido[0][1]};
+    }
+
     /** Carrito actual: productoId -> piezas. */
     private java.util.Map<Integer, Integer> carritoActual() {
         DefaultTableModel modelo = (DefaultTableModel) jTable1.getModel();
@@ -169,7 +263,7 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
     }
 
     private void avisoExistencias(String msg) {
-        JOptionPane.showMessageDialog(this, msg, "Existencias", JOptionPane.WARNING_MESSAGE);
+        Tema.avisoExistencias(this, msg);
     }
 
     /** Productos sin precio final: el administrador autoriza el precio (contraseña + precio). */
@@ -228,9 +322,14 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
             if (autorizado == null) return;
             precioUnitario = autorizado;
         }
+        // Botanas con varias bolsas posibles (marca / sabor): se elige de cuál se gasta
+        String[] bol = pedirBolsa(nombre);
+        if (bol == null) return;
+        String bolsa = bol[0];
+        String nombreFila = bolsa.isEmpty() ? nombre : nombre + " · " + bol[1];
         int fila = -1, actual = 0;
         for (int i = 0; i < modelo.getRowCount(); i++) {
-            if (modelo.getValueAt(i, 0).toString().equals(id)) {
+            if (modelo.getValueAt(i, 0).toString().equals(id) && bolsaDeFila(modelo, i).equals(bolsa)) {
                 fila = i;
                 actual = Integer.parseInt(modelo.getValueAt(i, 2).toString());
                 break;
@@ -240,9 +339,8 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
             JOptionPane.showMessageDialog(this, MSG_MAX, "Aviso", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        java.util.Map<Integer, Integer> carrito = carritoActual();
-        carrito.merge(Integer.parseInt(id), cantidad, Integer::sum);
-        String msg = InventarioService.verificarAgregar(carrito, Integer.parseInt(id), nombre,
+        Carro carro = fila >= 0 ? armarCarro(fila, actual + cantidad, null, null, 0) : armarCarro(-1, 0, id, bolsa, cantidad);
+        String msg = InventarioService.verificarAgregar(carro.carrito, carro.bolsas, Integer.parseInt(id), nombreFila,
                 actual + cantidad, InventarioService.esAdmin());
         if (msg != null) { avisoExistencias(msg); return; }
 
@@ -251,7 +349,7 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
             modelo.setValueAt(actual + cantidad, fila, 2);
             modelo.setValueAt(subtotal + cantidad * precioUnitario, fila, 3);
         } else {
-            modelo.addRow(new Object[]{id, nombre, cantidad, cantidad * precioUnitario});
+            modelo.addRow(new Object[]{id, nombreFila, cantidad, cantidad * precioUnitario, bolsa});
         }
     }
 
@@ -282,10 +380,9 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
             JOptionPane.showMessageDialog(this, MSG_MAX, "Aviso", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        java.util.Map<Integer, Integer> carrito = carritoActual();
+        Carro carro = armarCarro(fila, v, null, null, 0);
         int pid = Integer.parseInt(modelo.getValueAt(fila, 0).toString());
-        carrito.put(pid, v);
-        String msg = InventarioService.verificarAgregar(carrito, pid, modelo.getValueAt(fila, 1).toString(), v, InventarioService.esAdmin());
+        String msg = InventarioService.verificarAgregar(carro.carrito, carro.bolsas, pid, modelo.getValueAt(fila, 1).toString(), v, InventarioService.esAdmin());
         if (msg != null) { avisoExistencias(msg); return; }
         modelo.setValueAt(v, fila, 2);
         modelo.setValueAt(v * unit, fila, 3);
@@ -474,14 +571,16 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
         Tema.ambar(btnModificarInventario);
         btnModificarInventario.setFont(Tema.titulo(java.awt.Font.BOLD, 15));
         btnModificarInventario.addActionListener(evt -> btnModificarInventarioActionPerformed(evt));
-        btnModificarInventario.setVisible(esAdmin);   // solo el administrador la ve (igual que el HTML)
+        // Ya no se muestra en Ventas: las existencias dependen de recetas e insumos (se gestionan en sus pantallas),
+        // así que no se pueden modificar a mano desde aquí.
+        btnModificarInventario.setVisible(false);
 
         javax.swing.JPanel izq = new javax.swing.JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 8, 0));
         izq.setOpaque(false);
         izq.add(btnSalir); izq.add(lblTitulo);
         izq.add(pageBtn1); izq.add(pageBtn2); izq.add(pageBtn3);
         izq.add(javax.swing.Box.createHorizontalStrut(6));
-        izq.add(btnVerTickets); izq.add(btnModificarInventario);
+        izq.add(btnVerTickets);
 
         jLblHora.setFont(Tema.titulo(java.awt.Font.BOLD, 15));
         jLblHora.setForeground(Tema.BLANCO);
@@ -542,13 +641,13 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
         jTable1.setIntercellSpacing(new java.awt.Dimension(0, 1));
         jTable1.setModel(new javax.swing.table.DefaultTableModel(
                 new Object[][]{},
-                new String[]{"ID", "Producto", "Cant.", "Precio"}
+                new String[]{"ID", "Producto", "Cant.", "Precio", "Bolsa"}
         ) {
             final Class[] types = new Class[]{
                 java.lang.Object.class, java.lang.String.class,
-                java.lang.Object.class, java.lang.Object.class
+                java.lang.Object.class, java.lang.Object.class, java.lang.Object.class
             };
-            final boolean[] canEdit = new boolean[]{false, false, true, false};
+            final boolean[] canEdit = new boolean[]{false, false, true, false, false};
 
             @Override public Class getColumnClass(int c)          { return types[c];   }
             @Override public boolean isCellEditable(int r, int c) { return canEdit[c]; }
@@ -577,6 +676,23 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
                 return true;
             }
         });
+        // Guardar la cantidad sin necesidad de Enter: al perder el foco la tabla confirma lo escrito
+        jTable1.putClientProperty("terminateEditOnFocusLost", Boolean.TRUE);
+        // Respaldo: un clic en cualquier parte fuera de la tabla (productos, fondo, pestañas) también confirma la edición
+        java.awt.Toolkit.getDefaultToolkit().addAWTEventListener(new java.awt.event.AWTEventListener() {
+            @Override public void eventDispatched(java.awt.AWTEvent ev) {
+                if (ev.getID() != java.awt.event.MouseEvent.MOUSE_PRESSED) return;
+                if (!jTable1.isEditing() || !jTable1.isShowing()) return;
+                Object src = ev.getSource();
+                if (src instanceof java.awt.Component
+                        && javax.swing.SwingUtilities.isDescendingFrom((java.awt.Component) src, jTable1)) return;
+                // Se confirma YA (antes de que el clic llegue al componente destino). Si se hiciera después,
+                // la tabla le "devolvería" el foco a sí misma y lo escrito en otro campo (p. ej. Efectivo recibido)
+                // caería en la columna Cant.
+                javax.swing.table.TableCellEditor ed = jTable1.getCellEditor();
+                if (ed != null) ed.stopCellEditing();
+            }
+        }, java.awt.AWTEvent.MOUSE_EVENT_MASK);
         javax.swing.table.DefaultTableCellRenderer rCant = new javax.swing.table.DefaultTableCellRenderer() {
             @Override public java.awt.Component getTableCellRendererComponent(javax.swing.JTable t, Object v,
                     boolean sel, boolean foc, int r, int c) {
@@ -621,17 +737,17 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
         btnEliminarProducto.addActionListener(evt -> btnEliminarProductoActionPerformed(evt));
         btnQuitarCantidad.setText("−");
         btnSumarCantidad.setText("+");
-        Tema.claro(btnQuitarCantidad); Tema.primario(btnSumarCantidad);
+        Tema.estilo(btnQuitarCantidad, Tema.ROJO, Tema.BLANCO, Tema.ROJO.darker()); Tema.primario(btnSumarCantidad);
         btnQuitarCantidad.setFont(Tema.fuente(java.awt.Font.BOLD, 22));
         btnSumarCantidad.setFont(Tema.fuente(java.awt.Font.BOLD, 22));
         btnQuitarCantidad.putClientProperty(com.formdev.flatlaf.FlatClientProperties.STYLE,
-                "arc:14; borderWidth:1; borderColor:#CFE2DE; focusWidth:0; background:#FFFFFF; foreground:#0A3640; hoverBackground:#D6E8E4");
+                "arc:14; borderWidth:0; focusWidth:0; background:#C0392B; foreground:#FFFFFF; hoverBackground:#A93226; pressedBackground:#8E2B21");
         btnQuitarCantidad.addActionListener(evt -> btnQuitarCantidadActionPerformed(evt));
         btnSumarCantidad.addActionListener(evt -> btnSumarCantidadActionPerformed(evt));
         javax.swing.JPanel filaCant = new javax.swing.JPanel(new java.awt.GridBagLayout());
         filaCant.setOpaque(false);
         java.awt.GridBagConstraints gc = new java.awt.GridBagConstraints();
-        gc.fill = java.awt.GridBagConstraints.BOTH; gc.weighty = 1; gc.insets = new java.awt.Insets(0, 0, 0, 8);
+        gc.fill = java.awt.GridBagConstraints.BOTH; gc.weighty = 1; gc.insets = new java.awt.Insets(0, 0, 0, 16);   // más aire entre Quitar producto, − y +
         gc.weightx = 1; filaCant.add(btnEliminarProducto, gc);
         gc.weightx = 0; gc.ipadx = 18; filaCant.add(btnQuitarCantidad, gc);
         gc.insets = new java.awt.Insets(0, 0, 0, 0); filaCant.add(btnSumarCantidad, gc);
@@ -866,12 +982,8 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
             con.setAutoCommit(false);
 
             // Inventario por insumos (prototipo): consumo del carrito y validación de existencias
-            java.util.Map<Integer, Integer> carrito = new java.util.LinkedHashMap<>();
-            for (int i = 0; i < modelo.getRowCount(); i++) {
-                carrito.merge(Integer.parseInt(modelo.getValueAt(i, 0).toString()),
-                              Integer.parseInt(modelo.getValueAt(i, 2).toString()), Integer::sum);
-            }
-            InventarioService.Consumo consumo = InventarioService.calcularConsumo(con, carrito);
+            Carro carroVenta = armarCarro(-1, 0, null, null, 0);
+            InventarioService.Consumo consumo = InventarioService.calcularConsumo(con, carroVenta.carrito, carroVenta.bolsas);
             InventarioService.validar(con, consumo, InventarioService.esAdmin());
 
             boolean pagoOk = Esquema.pagoListo(), empOk = Esquema.empleadoListo();
@@ -928,6 +1040,7 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
                     + " · Descontó inventario");
             con.commit();
             final int folioVenta = ventaId;
+            BarraLateral.actualizarInsignia();   // la venta descontó existencias: la insignia cambia al instante
 
             modelo.setRowCount(0);
             jtxtEfectivo.setText("");
@@ -944,8 +1057,7 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
                     "Error", JOptionPane.ERROR_MESSAGE);
         } catch (InventarioService.StockException ex) {
             if (con != null) try { con.rollback(); } catch (SQLException e1) {}
-            JOptionPane.showMessageDialog(this, ex.getMessage(),
-                    "Existencias", JOptionPane.WARNING_MESSAGE);
+            avisoExistencias(ex.getMessage());
         } catch (NumberFormatException ex) {
             if (con != null) try { con.rollback(); } catch (SQLException e1) {}
             JOptionPane.showMessageDialog(this,
@@ -962,7 +1074,15 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
     private void btnEliminarProductoActionPerformed(java.awt.event.ActionEvent evt) {
         int fila = jTable1.getSelectedRow();
         if (fila >= 0) {
-            ((DefaultTableModel) jTable1.getModel()).removeRow(fila);
+            DefaultTableModel modelo = (DefaultTableModel) jTable1.getModel();
+            String nombre = String.valueOf(modelo.getValueAt(fila, 1)).trim();
+            String cant   = String.valueOf(modelo.getValueAt(fila, 2)).trim();
+            // validación: pedir confirmación antes de quitar el producto de la venta
+            if (!Tema.confirmar(this, "¿Quitar producto?",
+                    "Se quitará «" + nombre + "» (" + cant + (cant.equals("1") ? " pieza" : " piezas") + ") de la venta actual.",
+                    "Quitar", true)) return;
+            if (fila >= modelo.getRowCount()) return;   // por si la tabla cambió mientras se confirmaba
+            modelo.removeRow(fila);
             calcularTotal();
         } else {
             JOptionPane.showMessageDialog(this, "Selecciona un producto para eliminar.");
@@ -979,10 +1099,9 @@ public class FrmRegistrarVentas extends javax.swing.JFrame {
                 JOptionPane.showMessageDialog(this, MSG_MAX, "Aviso", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            java.util.Map<Integer, Integer> carritoMas = carritoActual();
+            Carro carroMas = armarCarro(fila, cantidadActual + 1, null, null, 0);
             int pidMas = Integer.parseInt(modelo.getValueAt(fila, 0).toString());
-            carritoMas.put(pidMas, cantidadActual + 1);
-            String msgMas = InventarioService.verificarAgregar(carritoMas, pidMas, modelo.getValueAt(fila, 1).toString(),
+            String msgMas = InventarioService.verificarAgregar(carroMas.carrito, carroMas.bolsas, pidMas, modelo.getValueAt(fila, 1).toString(),
                     cantidadActual + 1, InventarioService.esAdmin());
             if (msgMas != null) { avisoExistencias(msgMas); return; }
             cantidadActual++;

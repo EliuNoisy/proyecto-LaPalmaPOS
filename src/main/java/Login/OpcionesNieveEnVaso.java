@@ -151,7 +151,7 @@ private FrmRegistrarVentas parent;
 
     private void jBtnNieveDeVasoChicoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jBtnNieveDeVasoChicoActionPerformed
         String id = "28";
-        String nombre = "Nieve en vaso chico";
+        String nombre = "Nieve de vaso chico";
         int cantidad = 1;
         double precio = 15.00;
 
@@ -162,7 +162,7 @@ private FrmRegistrarVentas parent;
 
     private void jBtnNieveDeVasoMedianoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jBtnNieveDeVasoMedianoActionPerformed
         String id = "29";
-        String nombre = "Nieve en vaso mediano";
+        String nombre = "Nieve de vaso mediano";
         int cantidad = 1;
         double precio = 20.00;
 
@@ -173,7 +173,7 @@ private FrmRegistrarVentas parent;
 
     private void jBtnNieveDeVasoGrandeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jBtnNieveDeVasoGrandeActionPerformed
         String id = "30";
-        String nombre = "Nieve en vaso grande";
+        String nombre = "Nieve de vaso grande";
         int cantidad = 1;
         double precio = 25.00;
 

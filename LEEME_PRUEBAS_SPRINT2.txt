@@ -1,0 +1,34 @@
+PRUEBAS NUEVAS DEL SPRINT 2 (HU10 - Editar productos)
+=====================================================
+Carpeta: src/test/java/Login
+
+  Sprint2EditarProductosTest   52 pruebas  Reglas y limites al editar (nombre 40, precio 0.01-9,999.99, existencias 0-9,999),
+                                           limite de caracteres de los campos de la ventana de edicion, texto del historial
+                                           y revision del codigo de la edicion (c1 guardar, c2 lista actualizada,
+                                           c3 producto inexistente, c4 falla el guardado).
+
+Como ejecutarlas
+  - NetBeans: clic derecho a Sprint2EditarProductosTest -> Test File.
+  - Maven:    mvn -Dtest=Sprint2EditarProductosTest test
+  Ejecuta SIEMPRE desde la carpeta del proyecto (varias pruebas leen src/main/java).
+  No necesitan SQL Server.
+
+Importante
+  - Cada prueba lleva arriba [HU10, criterio, prueba manual P34-P37 de la hoja "Pruebas Sprint 2"].
+  - NO sustituyen la prueba manual P34-P37: revisan reglas y codigo, no que el aviso salga en pantalla.
+
+PRUEBAS NUEVAS DEL SPRINT 2 (HU16 - Insumos y HU17 - Recetas)
+=============================================================
+  Sprint2InsumosTest   26 pruebas  HU16 (P38-P42): limites de existencias (0 a 99,999; enteras por pieza), formatos raros,
+                                   nombre repetido (mayusculas, acentos, plural), solo administrador, insumo en uso / «Nieve»,
+                                   y revision del codigo (duplicado antes de insertar, eliminar, entrada rapida, ajuste grande).
+  Sprint2RecetasTest   35 pruebas  HU17 (P43-P48): cantidad por porcion (mayor a 0 y hasta 9,999), lectura de la receta,
+                                   descuento por venta, porciones disponibles, nieve (bolas, peso de bola 1-999 g, vaso/cono),
+                                   producto sin receta, y revision del codigo (guardar todo-o-nada, copiar no escribe, sin repetidos).
+
+  Cambio en el codigo del programa (sin cambiar su comportamiento): se extrajeron las reglas a metodos que se pueden probar
+  sin abrir ventanas: FrmGestionarInsumos.errorCantidad(...), FrmRecetas.errorCantidad(...) y FrmRecetas.errorPesoBola(...).
+  Las ventanas ahora llaman a esos metodos y muestran el mismo mensaje de antes.
+
+  Como ejecutarlas:  mvn -Dtest=Sprint2InsumosTest+Sprint2RecetasTest test   (desde la carpeta del proyecto; sin SQL Server)
+  Siguen sin sustituir las pruebas manuales P38-P48 (que el aviso salga en pantalla, que la lista se actualice, etc.).

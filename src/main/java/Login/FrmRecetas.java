@@ -9,6 +9,9 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -17,9 +20,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
+import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -33,6 +39,7 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellRenderer;
 
 /**
  * Recetas y tipos de producto (HU17 + niveles de nieve del prototipo).
@@ -51,6 +58,10 @@ public class FrmRecetas extends JFrame {
     private static final String[] TIPO_CORTO = {"Directo", "Preparado", "Nieve"};
 
     private static FrmRecetas instancia;
+
+    /** Altura de una fila con el nombre en una sola línea; cada línea extra del nombre suma {@link #LINEA_NOMBRE}. */
+    private static final int FILA_BASE = 78, LINEA_NOMBRE = 23;
+    private static final int ANCHO_RESERVADO = 22 + 16 + 4;   // márgenes de la fila
 
     /** Abre la pantalla (una sola ventana a la vez; si ya estaba abierta, la trae al frente). */
     public static void abrir() { abrir(null); }
@@ -85,23 +96,52 @@ public class FrmRecetas extends JFrame {
     private final DefaultTableModel mProductos = new DefaultTableModel(new Object[]{"ID", "Producto", "Tipo", "Estado"}, 0) {
         @Override public boolean isCellEditable(int r, int c) { return false; }
     };
-    private final JTable tProductos = new JTable(mProductos);
+    private final JTable tProductos = new JTable(mProductos) {
+        /** Es una lista, no una tabla: sin encabezado de columnas. */
+        @Override protected void configureEnclosingScrollPane() { }
+        /** Al pasar el mouse se ve el nombre completo, por si algún nombre es larguísimo. */
+        @Override public String getToolTipText(java.awt.event.MouseEvent e) {
+            int r = rowAtPoint(e.getPoint());
+            return r < 0 ? null : String.valueOf(mProductos.getValueAt(r, 1));
+        }
+    };
     private final JTextField txtBuscar = new JTextField(14);
     private final JCheckBox chkPendientes = new JCheckBox("Mostrar solo los que falta configurar");
-    private final JLabel lblPendientes = new JLabel(" ");
+    private final Pildora lblPendientes = new Pildora();
 
     private final JLabel lblProducto = new JLabel("Elige un producto");
-    private final JLabel lblPorciones = new JLabel(" ");
+    private final Pildora lblPorciones = new Pildora();
     private final JComboBox<String> cmbTipo = new JComboBox<>(TIPOS_UI);
-    private final JPanel filaTipo = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+    private final JPanel filaTipo = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
     private final JPanel cards = new JPanel(new CardLayout());
     private final JButton bGuardar = new JButton("Guardar cambios");
+    private JButton bQuit;
+    private final JLabel lblAyudaTabla = new JLabel("Toca un insumo de la tabla para elegirlo. Doble clic en su número para cambiar cuánto gasta.");
+    private final JLabel lblCambios = new JLabel("  Tienes cambios sin guardar  ");
     private JButton bBola;   // solo tiene sentido en productos de nieve
 
     private final DefaultTableModel mReceta = new DefaultTableModel(new Object[]{"ID", "Insumo", "Cantidad por porción", "Se mide en"}, 0) {
         @Override public boolean isCellEditable(int r, int c) { return c == 2; }
     };
-    private final JTable tReceta = new JTable(mReceta);
+    private final JTable tReceta = new JTable(mReceta) {
+        /** Tabla vacía: en vez de un hueco en blanco, explica qué hacer. */
+        @Override protected void paintComponent(java.awt.Graphics g) {
+            super.paintComponent(g);
+            if (getRowCount() > 0) return;
+            java.awt.Graphics2D g2 = (java.awt.Graphics2D) g.create();
+            g2.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING, java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            String a = "Este producto todavía no gasta ningún insumo";
+            String b = "Pulsa «Agregar insumo» para empezar";
+            g2.setFont(Tema.fuente(Font.BOLD, 17));
+            g2.setColor(Tema.TINTA);
+            int w = getWidth(), y = Math.max(getHeight(), 120) / 2 - 6;
+            g2.drawString(a, (w - g2.getFontMetrics().stringWidth(a)) / 2, y);
+            g2.setFont(Tema.fuente(Font.PLAIN, 15));
+            g2.setColor(Tema.GRIS);
+            g2.drawString(b, (w - g2.getFontMetrics().stringWidth(b)) / 2, y + 26);
+            g2.dispose();
+        }
+    };
 
     private final JSpinner spBolas = new JSpinner(new SpinnerNumberModel(1, 1, 20, 1));
     private final JComboBox<Ins> cmbContenedor = new JComboBox<>();
@@ -135,35 +175,22 @@ public class FrmRecetas extends JFrame {
         getContentPane().setLayout(new BorderLayout());
 
         // ── Izquierda: lista de productos ────────────────────────────────
-        tProductos.setFont(Tema.fuente(Font.PLAIN, 16));
-        tProductos.setRowHeight(42);
-        tProductos.setShowVerticalLines(false);
-        tProductos.setIntercellSpacing(new Dimension(0, 1));
+        // Una sola columna: nombre completo + tipo a la izquierda y el estado como etiqueta a la derecha.
+        tProductos.setRowHeight(FILA_BASE);
+        tProductos.setShowGrid(false);
+        tProductos.setIntercellSpacing(new Dimension(0, 0));
         tProductos.setFillsViewportHeight(true);
-        tProductos.getTableHeader().setFont(Tema.fuente(Font.BOLD, 12));
-        tProductos.getTableHeader().setReorderingAllowed(false);
-        tProductos.getColumnModel().getColumn(0).setMinWidth(0);
-        tProductos.getColumnModel().getColumn(0).setMaxWidth(0);
-        tProductos.getColumnModel().getColumn(1).setPreferredWidth(190);
-        tProductos.getColumnModel().getColumn(2).setPreferredWidth(90);
-        tProductos.getColumnModel().getColumn(3).setPreferredWidth(130);
         tProductos.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
-        tProductos.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
-            @Override public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean foc, int row, int col) {
-                Component c = super.getTableCellRendererComponent(t, v, sel, foc, row, col);
-                boolean falta = String.valueOf(mProductos.getValueAt(row, 3)).startsWith("Falta");
-                c.setForeground(falta ? Tema.AMBAR_TEXTO : Tema.TINTA);
-                if (!sel) c.setBackground(falta ? Tema.AMBAR_SUAVE : Color.WHITE);
-                c.setFont(Tema.fuente(col == 1 || falta ? Font.BOLD : Font.PLAIN, 15));
-                setBorder(BorderFactory.createEmptyBorder(0, 12, 0, 6));
-                return c;
-            }
-        });
+        tProductos.setDefaultRenderer(Object.class, new FilaProducto());
+        // El ID, el tipo y el estado siguen en el modelo (el código los lee), solo se ocultan de la vista.
+        tProductos.removeColumn(tProductos.getColumnModel().getColumn(3));
+        tProductos.removeColumn(tProductos.getColumnModel().getColumn(2));
+        tProductos.removeColumn(tProductos.getColumnModel().getColumn(0));
         tProductos.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting() && !cargando && !restaurando) cambiarProducto();
         });
         txtBuscar.setFont(Tema.fuente(Font.PLAIN, 16));
-        txtBuscar.setPreferredSize(new Dimension(300, 44));
+        txtBuscar.setPreferredSize(new Dimension(300, 46));
         txtBuscar.putClientProperty("JTextField.placeholderText", "Buscar producto");
         Dlg.limite(txtBuscar, 40);
         txtBuscar.getDocument().addDocumentListener(new DocumentListener() {
@@ -175,50 +202,75 @@ public class FrmRecetas extends JFrame {
         chkPendientes.setOpaque(false);
         chkPendientes.setFont(Tema.fuente(Font.PLAIN, 14));
         chkPendientes.addActionListener(e -> cargarProductos());
-        lblPendientes.setFont(Tema.fuente(Font.BOLD, 14));
 
-        JPanel busqueda = new JPanel(new BorderLayout(0, 4));
-        busqueda.setOpaque(false);
-        JPanel filaBusca = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        filaBusca.setOpaque(false);
-        filaBusca.add(txtBuscar);
-        JPanel filtros = new JPanel(new GridLayout(2, 1, 0, 0));
+        JPanel filaEstado = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        filaEstado.setOpaque(false);
+        filaEstado.add(lblPendientes);
+        JPanel filtros = new JPanel();
         filtros.setOpaque(false);
+        filtros.setLayout(new BoxLayout(filtros, BoxLayout.Y_AXIS));
+        chkPendientes.setAlignmentX(Component.LEFT_ALIGNMENT);
+        filaEstado.setAlignmentX(Component.LEFT_ALIGNMENT);
         filtros.add(chkPendientes);
-        filtros.add(lblPendientes);
-        busqueda.add(filaBusca, BorderLayout.NORTH);
+        filtros.add(Box.createVerticalStrut(10));
+        filtros.add(filaEstado);
+        JPanel busqueda = new JPanel(new BorderLayout(0, 12));
+        busqueda.setOpaque(false);
+        busqueda.add(txtBuscar, BorderLayout.NORTH);
         busqueda.add(filtros, BorderLayout.CENTER);
-        busqueda.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        busqueda.setBorder(BorderFactory.createEmptyBorder(10, 12, 14, 12));
 
         JScrollPane spProd = new JScrollPane(tProductos);
-        spProd.setBorder(BorderFactory.createEmptyBorder());
+        spProd.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, Tema.LINEA));
         spProd.getViewport().setBackground(Color.WHITE);
+        spProd.getVerticalScrollBar().setUnitIncrement(24);
+        // si cambia el ancho de la lista, las filas se vuelven a medir para que el nombre siga completo
+        tProductos.addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override public void componentResized(java.awt.event.ComponentEvent e) { ajustarAlturas(); }
+        });
         Tema.Redondo izq = new Tema.Redondo(22, Color.WHITE, Tema.LINEA);
         izq.setLayout(new BorderLayout());
-        izq.setBorder(BorderFactory.createEmptyBorder(6, 6, 8, 6));
+        izq.setBorder(BorderFactory.createEmptyBorder(8, 8, 10, 8));
         izq.add(busqueda, BorderLayout.NORTH);
         izq.add(spProd, BorderLayout.CENTER);
-        izq.setPreferredSize(new Dimension(470, 0));
+        izq.setPreferredSize(new Dimension(580, 0));
 
         // ── Derecha: detalle del producto ────────────────────────────────
-        lblProducto.setFont(Tema.fuente(Font.BOLD, 24));
+        lblProducto.setFont(Tema.fuente(Font.BOLD, 28));
         lblProducto.setForeground(Tema.TINTA);
         lblPorciones.setFont(Tema.fuente(Font.BOLD, 15));
         cmbTipo.setFont(Tema.fuente(Font.PLAIN, 15));
+        cmbTipo.setPreferredSize(new Dimension(270, 42));
         cmbTipo.addActionListener(e -> {
             if (cargando) return;
             sucio = true;
             mostrarCard();
         });
         filaTipo.setOpaque(false);
-        filaTipo.add(Tema.etiqueta("¿Cómo se vende este producto?", Font.BOLD, 15, Tema.TINTA));
+        JLabel preguntaTipo = Tema.etiqueta("¿Cómo se vende este producto?", Font.BOLD, 15, Tema.TINTA);
+        preguntaTipo.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 14));
+        filaTipo.add(preguntaTipo);
         filaTipo.add(cmbTipo);
-        JPanel arriba = new JPanel(new GridLayout(0, 1, 2, 6));
+        JPanel filaPorciones = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        filaPorciones.setOpaque(false);
+        filaPorciones.add(lblPorciones);
+        JPanel arriba = new JPanel();
         arriba.setOpaque(false);
-        arriba.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
+        arriba.setLayout(new BoxLayout(arriba, BoxLayout.Y_AXIS));
+        // línea fina debajo del encabezado para separarlo del contenido
+        arriba.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createEmptyBorder(0, 12, 0, 12),
+                BorderFactory.createCompoundBorder(
+                        BorderFactory.createMatteBorder(0, 0, 1, 0, Tema.LINEA),
+                        BorderFactory.createEmptyBorder(8, 0, 18, 0))));
+        lblProducto.setAlignmentX(Component.LEFT_ALIGNMENT);
+        filaTipo.setAlignmentX(Component.LEFT_ALIGNMENT);
+        filaPorciones.setAlignmentX(Component.LEFT_ALIGNMENT);
         arriba.add(lblProducto);
+        arriba.add(Box.createVerticalStrut(14));
         arriba.add(filaTipo);
-        arriba.add(lblPorciones);
+        arriba.add(Box.createVerticalStrut(14));
+        arriba.add(filaPorciones);
 
         // tarjeta: nada elegido
         JPanel pVacio = new JPanel(new BorderLayout());
@@ -236,53 +288,117 @@ public class FrmRecetas extends JFrame {
                 + "Para cambiar cuántas piezas tiene: <b>Inventario → Modificar producto</b>.", Tema.fuente(Font.PLAIN, 16), Tema.TINTA), BorderLayout.NORTH);
 
         // tarjeta: preparado
-        JPanel pPrep = new JPanel(new BorderLayout(0, 8));
+        JPanel pPrep = new JPanel(new BorderLayout(0, 16));
         pPrep.setOpaque(false);
-        pPrep.setBorder(BorderFactory.createEmptyBorder(8, 12, 0, 12));
+        pPrep.setBorder(BorderFactory.createEmptyBorder(16, 12, 0, 12));
         tReceta.setFont(Tema.fuente(Font.PLAIN, 16));
-        tReceta.setRowHeight(40);
-        tReceta.getTableHeader().setFont(Tema.fuente(Font.BOLD, 12));
+        tReceta.setRowHeight(54);
+        tReceta.getTableHeader().setFont(Tema.fuente(Font.BOLD, 13));
+        tReceta.getTableHeader().setPreferredSize(new Dimension(0, 44));
+        // Encabezados en palabras de todos los días (el modelo conserva sus nombres internos)
+        tReceta.getColumnModel().getColumn(1).setHeaderValue("Insumo que se gasta");
+        tReceta.getColumnModel().getColumn(2).setHeaderValue("Cuánto gasta cada venta");
+        tReceta.getColumnModel().getColumn(3).setHeaderValue("Se mide en");
         tReceta.getTableHeader().setReorderingAllowed(false);
         tReceta.putClientProperty("terminateEditOnFocusLost", Boolean.TRUE);
         tReceta.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
         tReceta.getColumnModel().getColumn(0).setMinWidth(0);
         tReceta.getColumnModel().getColumn(0).setMaxWidth(0);
+        tReceta.setShowGrid(false);
+        tReceta.setIntercellSpacing(new Dimension(0, 0));
+        tReceta.getColumnModel().getColumn(1).setPreferredWidth(380);
+        tReceta.getColumnModel().getColumn(2).setPreferredWidth(200);
+        tReceta.getColumnModel().getColumn(3).setPreferredWidth(140);
+        tReceta.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+            @Override public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean foc, int row, int col) {
+                super.getTableCellRendererComponent(t, v, sel, foc, row, col);
+                boolean cantidad = col == 2;   // columna «Cantidad por porción» (la única que se edita)
+                setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createMatteBorder(0, 0, 1, 0, Tema.LINEA),
+                        BorderFactory.createEmptyBorder(0, 18, 0, 12)));
+                setHorizontalAlignment(cantidad ? CENTER : LEFT);
+                setFont(Tema.fuente(cantidad ? Font.BOLD : Font.PLAIN, 16));
+                setForeground(cantidad ? Tema.PALMA_OSC : col == 3 ? Tema.GRIS : Tema.TINTA);
+                setBackground(sel ? Tema.MENTA_SUAVE : cantidad ? Tema.PAPEL : Color.WHITE);
+                return this;
+            }
+        });
         mReceta.addTableModelListener(e -> { if (!cargando) sucio = true; });
-        JButton bAdd = boton("Agregar insumo", Tema.TEAL);
-        JButton bQuit = boton("Quitar el elegido", Tema.ROJO);
-        JButton bCopy = boton("Copiar receta de otro producto", Tema.PALMA);
+        // Colores con significado: VERDE = añadir, BLANCO = otra opción, ROJO = quitar
+        JButton bAdd = boton("+  Agregar insumo", Tema.OK_SUAVE);
+        Tema.estilo(bAdd, Tema.OK_SUAVE, Tema.PALMA_OSC, new Color(0xB5E6D9));
+        bAdd.putClientProperty(com.formdev.flatlaf.FlatClientProperties.STYLE, bAdd.getClientProperty(com.formdev.flatlaf.FlatClientProperties.STYLE) + "; borderWidth:2; borderColor:#14806C");
+        JButton bCopy = botonClaro("Copiar receta de otro producto");
+        bQuit = botonSuave("Quitar el insumo elegido");
+        bQuit.setEnabled(false);
         bAdd.setToolTipText("Añade un insumo a la receta de este producto.");
-        bQuit.setToolTipText("Quita de la receta el insumo que tengas elegido en la tabla.");
         bCopy.setToolTipText("Útil si este producto se parece a otro que ya tiene receta.");
+        bQuit.setToolTipText("Primero toca un insumo de la tabla. Te pediremos confirmar antes de quitarlo.");
         bAdd.addActionListener(e -> agregarInsumo());
         bQuit.addActionListener(e -> quitarInsumo());
         bCopy.addActionListener(e -> copiarReceta());
-        JPanel botRec = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        tReceta.getSelectionModel().addListSelectionListener(e -> {
+            boolean hay = tReceta.getSelectedRow() >= 0;
+            bQuit.setEnabled(hay);
+            lblAyudaTabla.setText(hay ? "Elegiste un insumo. Ahora puedes quitarlo con el botón rojo."
+                    : "Toca un insumo de la tabla para elegirlo. Doble clic en su número para cambiar cuánto gasta.");
+        });
+        JPanel botIzq = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        botIzq.setOpaque(false);
+        botIzq.add(bAdd); botIzq.add(bCopy);
+        JPanel botDer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        botDer.setOpaque(false);
+        botDer.add(bQuit);   // la acción que borra queda aparte, del otro lado, para no pulsarla por error
+        JPanel botRec = new JPanel(new BorderLayout(24, 0));
         botRec.setOpaque(false);
-        botRec.add(bAdd); botRec.add(bQuit); botRec.add(bCopy);
+        botRec.add(botIzq, BorderLayout.WEST);
+        botRec.add(botDer, BorderLayout.EAST);
+        lblAyudaTabla.setFont(Tema.fuente(Font.ITALIC, 14));
+        lblAyudaTabla.setForeground(Tema.GRIS);
+        lblAyudaTabla.setBorder(BorderFactory.createEmptyBorder(8, 2, 0, 0));
         JPanel textoPrep = new JPanel(new BorderLayout());
         textoPrep.setOpaque(false);
-        textoPrep.add(new AyudaPanel.Texto("<b>Insumos que gasta UNA porción.</b> Para cambiar una cantidad, haz doble clic sobre ella. "
-                + "Ejemplo: 1 pan, 80 g de carne.", Tema.fuente(Font.PLAIN, 15), Tema.TINTA), BorderLayout.CENTER);
+        textoPrep.add(new AyudaPanel.Texto("<b>Esto se gasta cada vez que se vende 1 de este producto.</b><br>"
+                + "Para cambiar una cantidad, haz <b>doble clic</b> sobre el número (ejemplo: 1 pan, 80 g de carne). "
+                + "Nada se guarda hasta que pulses <b>Guardar cambios</b>.", Tema.fuente(Font.PLAIN, 15), Tema.GRIS), BorderLayout.CENTER);
         JScrollPane spRec = new JScrollPane(tReceta);
         spRec.getViewport().setBackground(Color.WHITE);
         spRec.setBorder(BorderFactory.createLineBorder(Tema.LINEA));
-        pPrep.add(textoPrep, BorderLayout.NORTH);
-        pPrep.add(spRec, BorderLayout.CENTER);
-        pPrep.add(botRec, BorderLayout.SOUTH);
+        JPanel zonaAcciones = new JPanel(new BorderLayout(0, 14));
+        zonaAcciones.setOpaque(false);
+        zonaAcciones.add(textoPrep, BorderLayout.NORTH);
+        zonaAcciones.add(botRec, BorderLayout.CENTER);
+        JPanel zonaTabla = new JPanel(new BorderLayout());
+        zonaTabla.setOpaque(false);
+        zonaTabla.add(spRec, BorderLayout.CENTER);
+        zonaTabla.add(lblAyudaTabla, BorderLayout.SOUTH);
+        pPrep.add(zonaAcciones, BorderLayout.NORTH);
+        pPrep.add(zonaTabla, BorderLayout.CENTER);
 
         // tarjeta: nieve
-        JPanel pNieve = new JPanel(new GridLayout(0, 1, 4, 8));
+        JPanel pNieve = new JPanel();
         pNieve.setOpaque(false);
-        pNieve.setBorder(BorderFactory.createEmptyBorder(14, 14, 12, 14));
+        pNieve.setLayout(new BoxLayout(pNieve, BoxLayout.Y_AXIS));
+        pNieve.setBorder(BorderFactory.createEmptyBorder(18, 14, 12, 14));
         spBolas.setFont(Tema.fuente(Font.PLAIN, 16));
+        spBolas.setPreferredSize(new Dimension(130, 46));
+        spBolas.setMaximumSize(new Dimension(130, 46));
         cmbContenedor.setFont(Tema.fuente(Font.PLAIN, 16));
+        cmbContenedor.setPreferredSize(new Dimension(380, 46));
+        cmbContenedor.setMaximumSize(new Dimension(380, 46));
         lblGramos.setFont(Tema.fuente(Font.PLAIN, 15));
         lblGramos.setForeground(Tema.GRIS);
-        pNieve.add(Tema.etiqueta("¿Cuántas bolas de nieve lleva cada porción?", Font.BOLD, 15, Tema.TINTA));
+        JLabel qBolas = Tema.etiqueta("¿Cuántas bolas de nieve lleva cada porción?", Font.BOLD, 15, Tema.TINTA);
+        JLabel qVaso = Tema.etiqueta("¿Qué vaso o cono se usa? (se descuenta 1 por porción)", Font.BOLD, 15, Tema.TINTA);
+        for (JComponent c : new JComponent[]{qBolas, spBolas, qVaso, cmbContenedor, lblGramos}) c.setAlignmentX(Component.LEFT_ALIGNMENT);
+        pNieve.add(qBolas);
+        pNieve.add(Box.createVerticalStrut(10));
         pNieve.add(spBolas);
-        pNieve.add(Tema.etiqueta("¿Qué vaso o cono se usa? (se descuenta 1 por porción)", Font.BOLD, 15, Tema.TINTA));
+        pNieve.add(Box.createVerticalStrut(26));
+        pNieve.add(qVaso);
+        pNieve.add(Box.createVerticalStrut(10));
         pNieve.add(cmbContenedor);
+        pNieve.add(Box.createVerticalStrut(22));
         pNieve.add(lblGramos);
         spBolas.addChangeListener(e -> { if (!cargando) sucio = true; actualizarGramos(); });
         cmbContenedor.addActionListener(e -> { if (!cargando) sucio = true; });
@@ -296,24 +412,45 @@ public class FrmRecetas extends JFrame {
         cards.add(pPrep, "preparado");
         cards.add(pNieveWrap, "nieve");
 
-        bBola = boton("Peso de una bola de nieve", Tema.TEAL);
+        bBola = botonClaro("Peso de una bola de nieve");
         bBola.setToolTipText("Cuánto pesa una bola de nieve. Cambia el cálculo de TODOS los productos de nieve.");
         Tema.estilo(bGuardar, Tema.PALMA, Color.WHITE, Tema.PALMA_OSC);
         bGuardar.setFont(Tema.fuente(Font.BOLD, 15));
-        bGuardar.setPreferredSize(new Dimension(190, 48));
+        bGuardar.setPreferredSize(new Dimension(220, 52));
         bGuardar.setToolTipText("Nada se cambia hasta que pulses este botón.");
         bGuardar.setEnabled(false);
-        JButton bCerrar = boton("Cerrar", Tema.GRIS);
+        JButton bCerrar = botonClaro("Cerrar");
+        bCerrar.setPreferredSize(new Dimension(140, 52));
         bBola.addActionListener(e -> configurarBola());
         bGuardar.addActionListener(e -> guardar());
         bCerrar.addActionListener(e -> cerrar());
-        JPanel sur = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 8));
+        JPanel izqPie = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        izqPie.setOpaque(false);
+        izqPie.add(bBola);
+        lblCambios.setFont(Tema.fuente(Font.BOLD, 14));
+        lblCambios.setForeground(Tema.AMBAR_TEXTO);
+        lblCambios.setOpaque(true);
+        lblCambios.setBackground(Tema.AMBAR_SUAVE);
+        lblCambios.setBorder(BorderFactory.createEmptyBorder(10, 8, 10, 8));
+        lblCambios.setVisible(false);
+        // el aviso aparece solo cuando hay algo por guardar
+        new javax.swing.Timer(300, ev -> lblCambios.setVisible(sucio && productoActual >= 0)).start();
+        JPanel derPie = new JPanel(new FlowLayout(FlowLayout.RIGHT, 16, 0));
+        derPie.setOpaque(false);
+        derPie.add(lblCambios); derPie.add(bCerrar); derPie.add(bGuardar);
+        JPanel sur = new JPanel(new BorderLayout());
         sur.setOpaque(false);
-        sur.add(bBola); sur.add(bCerrar); sur.add(bGuardar);
+        sur.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createEmptyBorder(8, 12, 0, 12),
+                BorderFactory.createCompoundBorder(
+                        BorderFactory.createMatteBorder(1, 0, 0, 0, Tema.LINEA),
+                        BorderFactory.createEmptyBorder(20, 0, 4, 0))));
+        sur.add(izqPie, BorderLayout.WEST);
+        sur.add(derPie, BorderLayout.EAST);
 
         Tema.Redondo der = new Tema.Redondo(22, Color.WHITE, Tema.LINEA);
         der.setLayout(new BorderLayout());
-        der.setBorder(BorderFactory.createEmptyBorder(8, 8, 4, 8));
+        der.setBorder(BorderFactory.createEmptyBorder(16, 16, 12, 16));
         der.add(arriba, BorderLayout.NORTH);
         der.add(cards, BorderLayout.CENTER);
         der.add(sur, BorderLayout.SOUTH);
@@ -329,15 +466,19 @@ public class FrmRecetas extends JFrame {
                 new String[][]{
                     {"Directo (por pieza).", "Se vende tal cual, como un refresco. Cada venta descuenta 1 pieza de su propio inventario. No necesita receta."},
                     {"Preparado (con insumos).", "Se arma con varios insumos, como una torta o una hamburguesa. Pulsa <b>Agregar insumo</b> y escribe cuánto lleva UNA porción "
-                        + "(ejemplo: 1 pan y 80 g de carne). Si se parece a otro producto, usa <b>Copiar receta</b>."},
+                        + "(ejemplo: 1 pan y 80 g de carne). Si se parece a otro producto, usa <b>Copiar receta</b>: trae solo lo que se mide en gramos y no repite lo que ya tienes."},
+                    {"Solos y preparados (misma bolsa).", "Un producto «solo» y uno «preparado» de la misma marca (por ejemplo «Tostitos (solos)» y «Tostitos preparados») llevan en su receta "
+                        + "<b>1 Bolsa de Tostitos</b>. Así valen distinto precio pero descuentan del mismo inventario. Si a los preparados les quieres sumar queso, salsa u otro insumo, "
+                        + "agrégalo aquí en su receta; la bolsa déjala siempre."},
                     {"Nieve (por bolas).", "Escribe cuántas bolas lleva cada porción y qué vaso o cono se usa. Cuánto pesa una bola se cambia con «Peso de una bola de nieve»."},
                     {"Guardar.", "Nada se cambia hasta que pulses <b>Guardar cambios</b>; si intentas salir sin guardar, el sistema te avisa. "
                         + "Los cambios solo afectan ventas nuevas, no las anteriores."},
-                    {"Cuando termines.", "Ve a <b>Inventario</b>: ahí aparece cuántas porciones alcanzan con lo que hay. Si falta mercancía, repónla en <b>Insumos</b>."}},
+                    {"Cuando termines.", "Ve a <b>Inventario</b>: ahí aparece cuántas porciones alcanzan con lo que hay, y avisa «por reponer» cuando llegan al <b>stock mínimo</b> del producto. "
+                        + "Si falta mercancía, repónla en <b>Insumos</b>, que avisa con el stock mínimo de cada insumo."}},
                 "Un producto preparado o de nieve sin receta no se puede vender en la caja. Los que dicen «Falta…» en la lista están pendientes. "
               + "¿Falta un insumo en la lista? Créalo primero en «Insumos y recetas».");
 
-        JPanel centro = new JPanel(new BorderLayout(16, 0));
+        JPanel centro = new JPanel(new BorderLayout(22, 0));
         centro.setOpaque(false);
         centro.add(izq, BorderLayout.WEST);
         centro.add(der, BorderLayout.CENTER);
@@ -361,9 +502,19 @@ public class FrmRecetas extends JFrame {
 
     private static JButton boton(String t, Color c) {
         JButton b = new JButton(t);
-        b.setFont(Tema.fuente(Font.BOLD, 15));
         Tema.estilo(b, c, Color.WHITE, c.darker());
-        b.setPreferredSize(new Dimension(b.getPreferredSize().width + 8, 46));
+        return dimensionar(b);
+    }
+
+    /** Botón blanco con borde: acciones secundarias, para que no compitan con «Guardar cambios». */
+    private static JButton botonClaro(String t) { return dimensionar(Tema.claro(new JButton(t))); }
+
+    /** Botón rojo suave: acción que quita algo, sin gritar tanto como el rojo sólido. */
+    private static JButton botonSuave(String t) { return dimensionar(Tema.peligro(new JButton(t))); }
+
+    private static JButton dimensionar(JButton b) {
+        b.setFont(Tema.fuente(Font.BOLD, 15));
+        b.setPreferredSize(new Dimension(b.getPreferredSize().width + 44, 52));
         return b;
     }
 
@@ -447,7 +598,21 @@ public class FrmRecetas extends JFrame {
         lblPendientes.setText(pendientes == 0 ? "Todos los productos están listos." : "Faltan " + pendientes + " producto(s) por configurar.");
         lblPendientes.setForeground(pendientes == 0 ? Tema.OK : Tema.AMBAR_TEXTO);
         cargando = false;
+        ajustarAlturas();
         seleccionarFila(sel);
+    }
+
+    /** Da a cada fila la altura que necesita su nombre completo (hasta varias líneas), sin cortarlo con «…». */
+    private void ajustarAlturas() {
+        int ancho = tProductos.getWidth() - ANCHO_RESERVADO;
+        if (ancho <= 60) return;
+        java.awt.FontMetrics fm = tProductos.getFontMetrics(Tema.fuente(Font.BOLD, 17));
+        for (int i = 0; i < mProductos.getRowCount(); i++) {
+            int w = fm.stringWidth(String.valueOf(mProductos.getValueAt(i, 1)));
+            int lineas = Math.max(1, (int) Math.ceil(w * 1.08 / ancho));   // 8 % de margen por el corte entre palabras
+            int h = FILA_BASE + (lineas - 1) * LINEA_NOMBRE;
+            if (tProductos.getRowHeight(i) != h) tProductos.setRowHeight(i, h);
+        }
     }
 
     /** Vuelve a marcar en la lista el producto con ese id (sin disparar el cambio de producto). */
@@ -569,7 +734,10 @@ public class FrmRecetas extends JFrame {
         if (libres.isEmpty()) { Dlg.aviso(this, "Nada más que agregar", "Ya agregaste todos los insumos que existen.\nSi falta alguno, créalo en «Insumos y recetas»."); return; }
         JComboBox<Ins> cmb = new JComboBox<>(libres.toArray(new Ins[0]));
         JTextField cant = new JTextField("1", 8);
-        Dlg.limite(cant, 8);
+        Dlg.soloNumeros(cant, 8, () -> {
+            Ins i = (Ins) cmb.getSelectedItem();
+            return i == null || !"pieza".equals(i.unidad);
+        });
         JLabel unidad = Tema.etiqueta(" ", Font.PLAIN, 13, Tema.GRIS);
         Runnable pintarUnidad = () -> {
             Ins i = (Ins) cmb.getSelectedItem();
@@ -578,7 +746,7 @@ public class FrmRecetas extends JFrame {
         };
         cmb.addActionListener(e -> pintarUnidad.run());
         pintarUnidad.run();
-        JPanel p = new JPanel(new GridLayout(0, 1, 4, 6));
+        JPanel p = new JPanel(new GridLayout(0, 1, 6, 10));
         p.add(new JLabel("Insumo:")); p.add(cmb);
         p.add(new JLabel("¿Cuánto lleva UNA porción de este producto?")); p.add(cant); p.add(unidad);
         Dlg.enfocar(cant);
@@ -598,6 +766,17 @@ public class FrmRecetas extends JFrame {
         int f = tReceta.getSelectedRow();
         if (f < 0) { Dlg.aviso(this, "Elige un insumo", "Toca primero el insumo de la tabla que quieres quitar y luego pulsa «Quitar el elegido»."); return; }
         if (tReceta.isEditing()) tReceta.getCellEditor().cancelCellEditing();
+        String insumo = String.valueOf(mReceta.getValueAt(f, 1));
+        String cant = String.valueOf(mReceta.getValueAt(f, 2)) + " " + mReceta.getValueAt(f, 3);
+        String producto = lblProducto.getText();
+        StringBuilder msg = new StringBuilder("Vas a eliminar «" + insumo + "» (" + cant + ") de la receta de «" + producto + "».");
+        if (mReceta.getRowCount() == 1)
+            msg.append("\n\nOjo: es el único insumo, así que el producto NO se podrá vender hasta que agregues otro.");
+        String bolsa = InventarioService.bolsaDe(producto);
+        if (bolsa != null && bolsa.equalsIgnoreCase(insumo))
+            msg.append("\n\nNota: este producto siempre descuenta 1 pieza de «" + bolsa + "» al venderse, aunque lo elimines de la tabla.");
+        msg.append("\n\nSe elimina de verdad hasta que pulses «Guardar cambios».");
+        if (!Tema.confirmar(this, "¿Estás seguro de eliminar este insumo?", msg.toString(), "Sí, eliminar", true)) return;
         mReceta.removeRow(f);
     }
 
@@ -615,55 +794,84 @@ public class FrmRecetas extends JFrame {
             }
         } catch (SQLException ex) { error(ex.getMessage()); return; }
         if (ids.isEmpty()) { Dlg.aviso(this, "Sin recetas", "Ningún otro producto tiene receta todavía."); return; }
-        JPanel p = new JPanel(new GridLayout(0, 1, 4, 6));
+        JPanel p = new JPanel(new GridLayout(0, 1, 6, 10));
         p.add(new JLabel("¿De qué producto quieres copiar los insumos?")); p.add(cmb);
+        JLabel nota = new JLabel("<html><div style='width:330px'>Solo se copian los insumos que se miden en <b>gramos</b> (queso, salsa, carne...). "
+                + "Lo que se cuenta en piezas (pan, bolsas, vasos) no se copia, y lo que ya tiene este producto se queda igual: no se repite ni se quita nada.</div></html>");
+        nota.setForeground(Tema.GRIS);
+        p.add(nota);
         if (!Dlg.formulario(this, "Copiar receta", p, "Copiar")) return;
-        if (mReceta.getRowCount() > 0 && !Tema.confirmar(this, "¿Reemplazar la receta?",
-                "Los insumos que ya agregaste a este producto se cambiarán por los del producto elegido.", "Sí, reemplazar", true)) return;
         int origen = ids.get(cmb.getSelectedIndex());
         if (tReceta.isEditing()) tReceta.getCellEditor().cancelCellEditing();
-        mReceta.setRowCount(0);
+        DefaultTableModel temporal = new DefaultTableModel(new Object[]{"ID", "Insumo", "Cantidad por porción", "Se mide en"}, 0);
         try (Connection con = ConexionSQL.getConexionSqlServer()) {
-            cargarRecetaEn(con, origen, mReceta);
+            cargarRecetaEn(con, origen, temporal);
         } catch (SQLException ex) { error(ex.getMessage()); return; }
-        Dlg.aviso(this, "Insumos copiados", "Listo. Revisa las cantidades, ajústalas si hace falta y pulsa «Guardar cambios».");
+        int agregados = 0, repetidos = 0, piezas = 0;
+        for (int r = 0; r < temporal.getRowCount(); r++) {
+            if ("piezas".equals(temporal.getValueAt(r, 3))) { piezas++; continue; }   // solo gramos
+            int idIns = (int) temporal.getValueAt(r, 0);
+            boolean ya = false;
+            for (int k = 0; k < mReceta.getRowCount(); k++) if ((int) mReceta.getValueAt(k, 0) == idIns) { ya = true; break; }
+            if (ya) { repetidos++; continue; }                                           // evita duplicados
+            mReceta.addRow(new Object[]{temporal.getValueAt(r, 0), temporal.getValueAt(r, 1), temporal.getValueAt(r, 2), temporal.getValueAt(r, 3)});
+            agregados++;
+        }
+        StringBuilder m = new StringBuilder();
+        m.append(agregados == 0 ? "No se agregó ningún insumo nuevo." : "Se agregaron " + agregados + (agregados == 1 ? " insumo." : " insumos."));
+        if (repetidos > 0) m.append("\n" + repetidos + (repetidos == 1 ? " ya lo tenía" : " ya los tenía") + " este producto y se dejó igual.");
+        if (piezas > 0) m.append("\n" + piezas + (piezas == 1 ? " se cuenta" : " se cuentan") + " en piezas y no se copió.");
+        if (agregados > 0) m.append("\n\nRevisa las cantidades, ajústalas si hace falta y pulsa «Guardar cambios».");
+        Dlg.aviso(this, agregados > 0 ? "Insumos copiados" : "Nada que copiar", m.toString());
     }
 
     /** Cantidad por porción: mayor a 0 y hasta 9,999; entera si el insumo es por pieza. Null si hay error (ya avisó). */
     private Double validarCantidad(String txt, String unidad, String quien, JTextField campo) {
         String pref = quien == null ? "" : "«" + quien + "»: ";
-        String t0 = txt == null ? "" : txt.trim();
-        String t = t0.replace(",", ".");
-        String err = null;
-        if (t0.isEmpty()) err = "Escribe la cantidad.";
-        else if (t0.matches("^\\d{1,3}(,\\d{3})+(\\.\\d+)?$")) err = "Escribe el número sin coma para los miles (por ejemplo 1500 y no 1,500).";
-        else if (!t.matches("^\\d+(\\.\\d{1,2})?$")) err = "La cantidad solo puede llevar números, sin letras ni signos (ejemplo: 1 o 80).";
-        else {
-            double v = Double.parseDouble(t);
-            if (v <= 0 || v > 9999) err = "La cantidad debe ser mayor a 0 y hasta 9,999.";
-            else if ("pieza".equals(unidad) && v != Math.rint(v)) err = "Este insumo se cuenta por pieza: usa un número entero, sin decimales.";
-        }
+        String err = errorCantidad(txt, unidad);
         if (err != null) {
             if (campo != null) Validar.mostrar(this, pref + err, campo); else Dlg.problema(this, pref + err);
             return null;
         }
-        return Double.parseDouble(t);
+        return Double.parseDouble(txt.trim().replace(",", "."));
+    }
+
+    /** Regla de la cantidad por porción sin tocar la pantalla (así se puede probar con JUnit). Mensaje de error o null si es válida. */
+    static String errorCantidad(String txt, String unidad) {
+        String t0 = txt == null ? "" : txt.trim();
+        String t = t0.replace(",", ".");
+        if (t0.isEmpty()) return "Escribe la cantidad.";
+        if (t0.matches("^\\d{1,3}(,\\d{3})+(\\.\\d+)?$")) return "Escribe el número sin coma para los miles (por ejemplo 1500 y no 1,500).";
+        if (!t.matches("^\\d+(\\.\\d{1,2})?$")) return "La cantidad solo puede llevar números, sin letras ni signos (ejemplo: 1 o 80).";
+        double v = Double.parseDouble(t);
+        if (v <= 0 || v > 9999) return "La cantidad debe ser mayor a 0 y hasta 9,999.";
+        if ("pieza".equals(unidad) && v != Math.rint(v)) return "Este insumo se cuenta por pieza: usa un número entero, sin decimales.";
+        return null;
+    }
+
+    /** Peso de una bola de nieve: mayor a 0 y hasta 999 g, máximo 2 decimales. Mensaje de error o null si es válido. */
+    static String errorPesoBola(String txt) {
+        String t = txt == null ? "" : txt.trim().replace(",", ".");
+        if (!t.matches("^\\d+(\\.\\d{1,2})?$") || Double.parseDouble(t) <= 0 || Double.parseDouble(t) > 999)
+            return "Escribe un peso mayor a 0 y hasta 999 gramos (ejemplo: 60).";
+        return null;
     }
 
     private void configurarBola() {
         double actual = 60;
         try (Connection con = ConexionSQL.getConexionSqlServer()) { actual = InventarioService.gramosPorBola(con); } catch (Exception ignored) { }
         JTextField peso = new JTextField(String.valueOf(actual == Math.rint(actual) ? String.valueOf((long) actual) : String.valueOf(actual)), 8);
-        Dlg.limite(peso, 6);
-        JPanel p = new JPanel(new GridLayout(0, 1, 4, 6));
+        Dlg.soloNumeros(peso, 6, () -> true);
+        JPanel p = new JPanel(new GridLayout(0, 1, 6, 10));
         p.add(new JLabel("¿Cuántos gramos pesa UNA bola de nieve? (pesa una de prueba)")); p.add(peso);
         p.add(Tema.etiqueta("Esto cambia el cálculo de todos los productos de nieve, solo en ventas nuevas.", Font.PLAIN, 13, Tema.GRIS));
         Dlg.enfocar(peso);
         while (true) {
             if (!Dlg.formulario(this, "Peso de una bola de nieve", p, "Guardar peso")) return;
             String t = peso.getText().trim().replace(",", ".");
-            if (!t.matches("^\\d+(\\.\\d{1,2})?$") || Double.parseDouble(t) <= 0 || Double.parseDouble(t) > 999) {
-                Validar.mostrar(this, "Escribe un peso mayor a 0 y hasta 999 gramos (ejemplo: 60).", peso);
+            String errPeso = errorPesoBola(peso.getText());
+            if (errPeso != null) {
+                Validar.mostrar(this, errPeso, peso);
                 continue;
             }
             try (Connection con = ConexionSQL.getConexionSqlServer();
@@ -782,6 +990,7 @@ public class FrmRecetas extends JFrame {
             sucio = false;
             cargarProductos();
             cargarDetalle();
+            BarraLateral.actualizarInsignia();
             long porciones = InventarioService.porcionesDisponibles(con, productoActual);
             String extra = porciones == 0 ? "\n\nOjo: hoy no alcanzan los insumos para ninguna porción. Repón en «Insumos y recetas»."
                          : porciones > 0 ? "\n\nCon lo que hay hoy alcanzan " + porciones + (porciones == 1 ? " porción." : " porciones.") : "";
@@ -801,5 +1010,78 @@ public class FrmRecetas extends JFrame {
             Tema.vestir(getContentPane(), false);
         }
         super.setVisible(b);
+    }
+
+    /** Etiqueta con forma de píldora; el fondo es el color del texto muy aclarado. */
+    private static final class Pildora extends JLabel {
+        Pildora() {
+            super(" ");
+            setOpaque(false);
+            setFont(Tema.fuente(Font.BOLD, 14));
+            setBorder(BorderFactory.createEmptyBorder(6, 16, 6, 16));
+        }
+        @Override protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            Color f = getForeground();
+            g2.setColor(new Color((int) (f.getRed() * .13 + 255 * .87), (int) (f.getGreen() * .13 + 255 * .87),
+                    (int) (f.getBlue() * .13 + 255 * .87)));
+            g2.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
+            g2.dispose();
+            super.paintComponent(g);
+        }
+    }
+
+    /** Fila de la lista de productos: nombre completo (varias líneas si hace falta); abajo, cómo se vende y su estado. */
+    private final class FilaProducto extends JPanel implements TableCellRenderer {
+        private final JLabel nombre = new JLabel();
+        private final JLabel tipo = new JLabel();
+        private final Pildora estado = new Pildora();
+        private boolean elegida;
+
+        FilaProducto() {
+            super(new BorderLayout(0, 8));
+            setOpaque(true);
+            setBorder(BorderFactory.createEmptyBorder(12, 22, 12, 16));
+            nombre.setFont(Tema.fuente(Font.BOLD, 17));
+            nombre.setForeground(Tema.TINTA);
+            nombre.setVerticalAlignment(javax.swing.SwingConstants.TOP);
+            tipo.setFont(Tema.fuente(Font.PLAIN, 13));
+            tipo.setForeground(Tema.GRIS);
+            estado.setFont(Tema.fuente(Font.BOLD, 12));
+            estado.setBorder(BorderFactory.createEmptyBorder(4, 12, 4, 12));
+            JPanel abajo = new JPanel(new BorderLayout(12, 0));
+            abajo.setOpaque(false);
+            abajo.add(tipo, BorderLayout.CENTER);
+            abajo.add(estado, BorderLayout.EAST);
+            add(nombre, BorderLayout.CENTER);
+            add(abajo, BorderLayout.SOUTH);
+        }
+
+        @Override public Component getTableCellRendererComponent(JTable t, Object v, boolean sel, boolean foc, int row, int col) {
+            String est = String.valueOf(mProductos.getValueAt(row, 3));
+            boolean falta = est.startsWith("Falta");
+            int k = Math.max(Arrays.asList(TIPO_CORTO).indexOf(String.valueOf(mProductos.getValueAt(row, 2))), 0);
+            int ancho = Math.max(120, t.getWidth() - ANCHO_RESERVADO);
+            String n = String.valueOf(mProductos.getValueAt(row, 1))
+                    .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+            nombre.setText("<html><body style='width:" + ancho + "px'>" + n + "</body></html>");   // el nombre baja de renglón en vez de cortarse
+            tipo.setText(TIPOS_UI[k]);
+            estado.setText(est);
+            estado.setForeground(falta ? Tema.AMBAR_TEXTO : new Color(0x167A4D));
+            elegida = sel;
+            setBackground(sel ? Tema.MENTA_SUAVE : falta ? new Color(0xFFF8EA) : Color.WHITE);
+            return this;
+        }
+
+        @Override protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            g.setColor(Tema.LINEA);
+            g.fillRect(0, getHeight() - 1, getWidth(), 1);
+            if (elegida) {
+                g.setColor(Tema.PALMA);
+                g.fillRect(0, 0, 6, getHeight() - 1);
+            }
+        }
     }
 }

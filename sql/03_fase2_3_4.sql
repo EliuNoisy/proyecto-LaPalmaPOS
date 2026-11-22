@@ -36,7 +36,7 @@ BEGIN
         (N'Nieve','g',8000),(N'Vaso chico','pieza',50),(N'Vaso mediano','pieza',50),(N'Vaso grande','pieza',40),
         (N'Cono de oblea','pieza',40),(N'Cono de galleta','pieza',40),(N'Pepino','g',1500),(N'Jícama','g',1500),
         (N'Fresa','g',2000),(N'Crema','g',1500),(N'Hielo','g',10000),(N'Jarabe','g',2000),
-        (N'Churritos','g',1500),(N'Bolsa de Sabritas','pieza',40)
+        (N'Churritos','g',1500),(N'Bolsa de Cheetos','pieza',0),(N'Bolsa de Chips','pieza',0),(N'Bolsa de Doritos','pieza',0),(N'Bolsa de Tostitos','pieza',0)
         ) v(Nombre, Unidad, Existencias))
     INSERT INTO dbo.Insumos (Nombre, Unidad, Existencias)
     SELECT s.Nombre, s.Unidad, s.Existencias FROM s
@@ -69,9 +69,10 @@ BEGIN
     ('RA',N'Hielo',200),('RA',N'Jarabe',50),
     ('TO',N'Totopos',80),('TO',N'Cacahuate',20),('TO',N'Pepino',40),('TO',N'Jícama',40),('TO',N'Salsa roja',20),
     ('CL',N'Churritos',80),('CL',N'Pepino',40),('CL',N'Jícama',40),('CL',N'Cacahuate',20),('CL',N'Salsa roja',20),
-    ('SC',N'Bolsa de Sabritas',1),('SC',N'Carne',100),('SC',N'Queso',20),('SC',N'Salsa roja',15),
-    ('SQ',N'Bolsa de Sabritas',1),('SQ',N'Queso',50),('SQ',N'Salsa roja',15),
-    ('OB',N'Tortilla para chalupa',1),('OB',N'Carne',80),('OB',N'Queso',30),('OB',N'Lechuga',10),('OB',N'Salsa roja',10);
+    ('SC',N'Carne',100),('SC',N'Queso',20),('SC',N'Salsa roja',15),
+    ('SQ',N'Queso',50),('SQ',N'Salsa roja',15),
+    ('OB',N'Tortilla para chalupa',1),('OB',N'Carne',80),('OB',N'Queso',30),('OB',N'Lechuga',10),('OB',N'Salsa roja',10),
+    ('BCH',N'Bolsa de Cheetos',1),('BCP',N'Bolsa de Chips',1),('BDO',N'Bolsa de Doritos',1),('BTO',N'Bolsa de Tostitos',1);
 
     DECLARE @Pat TABLE (Orden INT IDENTITY(1,1), Pat NVARCHAR(80), Tipo VARCHAR(10), Base VARCHAR(4),
                         Papas BIT, Mult DECIMAL(4,2), Bolas INT, Cont NVARCHAR(30));
@@ -101,7 +102,10 @@ BEGIN
     (N'Sabritas%carne%','preparado','SC',0,1,NULL,NULL),
     (N'Sabritas%salchicha%','preparado','SC',0,1,NULL,NULL),
     (N'Sabritas%queso%','preparado','SQ',0,1,NULL,NULL),
-    (N'Obispos%','preparado','OB',0,1,NULL,NULL);
+    (N'Obispos%','preparado','OB',0,1,NULL,NULL),
+    -- bolsas «solas»: se venden con receta de 1 bolsa, así hay UN solo conteo por marca (el insumo)
+    (N'Cheetos%solo%','preparado','BCH',0,1,NULL,NULL),(N'Chips%solo%','preparado','BCP',0,1,NULL,NULL),
+    (N'Doritos%solo%','preparado','BDO',0,1,NULL,NULL),(N'Tostitos%solo%','preparado','BTO',0,1,NULL,NULL);
 
     DECLARE @M TABLE (ProductoID INT PRIMARY KEY, Orden INT);
     INSERT @M (ProductoID, Orden)
@@ -117,6 +121,16 @@ BEGIN
     JOIN @M m ON m.ProductoID = p.id
     JOIN @Pat pt ON pt.Orden = m.Orden AND pt.Tipo = 'nieve'
     JOIN dbo.Insumos i ON i.Nombre = pt.Cont;
+
+    -- bolsas «solas»: las que ya tenías contadas en el producto pasan al insumo de su marca (una sola vez,
+    -- porque solo entran productos directos sin receta). Desde ahí el conteo vale por el insumo; la cantidad
+    -- del producto deja de usarse (la pantalla de Inventario muestra las bolsas que alcanzan).
+    UPDATE i SET Existencias = i.Existencias + p.cantidad
+    FROM @M m
+    JOIN @Pat pt ON pt.Orden = m.Orden AND pt.Base IN ('BCH','BCP','BDO','BTO')
+    JOIN @Rec r ON r.Base = pt.Base
+    JOIN dbo.Insumos i ON i.Nombre = r.Insumo
+    JOIN dbo.Productos p ON p.id = m.ProductoID;
 
     -- preparados: receta base (x multiplicador)
     INSERT dbo.Recetas (ProductoID, InsumoID, Cantidad)
@@ -181,6 +195,7 @@ BEGIN
         COMMIT;
         BEGIN TRY DBCC CHECKIDENT ('dbo.Ventas', RESEED, 0) WITH NO_INFOMSGS; END TRY BEGIN CATCH END CATCH
         EXEC dbo.sp_SembrarRecetas;
+        IF OBJECT_ID('dbo.sp_BolsasSolasPreparadas') IS NOT NULL EXEC dbo.sp_BolsasSolasPreparadas;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK;

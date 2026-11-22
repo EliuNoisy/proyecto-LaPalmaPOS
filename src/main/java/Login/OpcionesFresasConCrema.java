@@ -158,7 +158,7 @@ public class OpcionesFresasConCrema extends javax.swing.JDialog {
     }
 
     private void jBtnFresasConCremaYNieveGrandesActionPerformed(java.awt.event.ActionEvent evt) {
-        parent.agregarProducto("23", "Fresas con crema y nieves grandes", 1, 65.00);
+        parent.agregarProducto("23", "Fresas con crema y nieve grandes", 1, 65.00);
         parent.calcularTotal();
         this.dispose();
     }

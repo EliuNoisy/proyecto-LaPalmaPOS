@@ -81,4 +81,32 @@ public class LimiteCamposTest {
         f.getDocument().insertString(f.getDocument().getLength(), "zz", null);
         assertEquals("cdezz", f.getText());
     }
+
+    /** Campos de cantidad: solo números; letras y signos no entran, ni escritos ni pegados. */
+    @Test
+    public void soloNumerosRechazaLetrasYSignos() throws Exception {
+        JTextField f = new JTextField();
+        Dlg.soloNumeros(f, 8, () -> true);
+        f.getDocument().insertString(0, "12abc", null);
+        assertEquals("", f.getText());          // el pegado con letras se rechaza completo
+        f.getDocument().insertString(0, "12", null);
+        f.getDocument().insertString(2, "-", null);
+        f.getDocument().insertString(2, ",5", null);   // la coma se vuelve punto
+        assertEquals("12.5", f.getText());
+        f.getDocument().insertString(4, ".", null);    // un segundo punto no entra
+        f.getDocument().insertString(4, "5", null);    // segundo decimal: sí entra
+        f.getDocument().insertString(5, "5", null);    // un tercer decimal ya no
+        assertEquals("12.55", f.getText());
+    }
+
+    /** Insumos por pieza: solo enteros, sin punto. */
+    @Test
+    public void soloNumerosPorPiezaNoAceptaDecimales() throws Exception {
+        JTextField f = new JTextField();
+        Dlg.soloNumeros(f, 8, () -> false);
+        f.getDocument().insertString(0, "40.5", null);
+        assertEquals("", f.getText());
+        f.getDocument().insertString(0, "40", null);
+        assertEquals("40", f.getText());
+    }
 }
