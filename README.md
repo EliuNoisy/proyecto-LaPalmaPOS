@@ -103,3 +103,5 @@ Arquitectura en capas: presentación (Swing), lógica de negocio y servicios (`T
 | Miguel Obed Navarro Mora | HU2 |
 | Juan Antonio Valencia Sánchez | HU5 |
 | Karol Guadalupe López Navarro | HU9 |
+
+![CI](https://github.com/EliuNoisy/proyecto-LaPalmaPOS/actions/workflows/ci.yml/badge.svg)
